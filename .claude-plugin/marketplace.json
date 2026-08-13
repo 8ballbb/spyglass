@@ -1,0 +1,15 @@
+{
+  "$schema": "https://www.schemastore.org/claude-code-marketplace.json",
+  "name": "spyglass",
+  "description": "Design-first Python development for Claude Code.",
+  "owner": { "name": "Andrew Poole", "url": "https://github.com/8ballbb" },
+  "plugins": [
+    {
+      "name": "spyglass",
+      "description": "Pseudo-code planning, reuse investigation, and style enforcement before any Python is written.",
+      "source": "./",
+      "category": "productivity",
+      "tags": ["python", "design", "planning", "refactoring", "code-quality"]
+    }
+  ]
+}
