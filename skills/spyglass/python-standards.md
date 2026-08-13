@@ -40,29 +40,30 @@ These are judgment calls visible in a design document's prose contracts and
 structure, but they are advisory, not blocking — flag them as suggestions
 for the author to consider, not checkpoint failures.
 
-1. **Single responsibility per function.** A function's contract should
-   describe one operation, not a chain of unrelated ones. The test is
-   whether the description reads as one coherent action or as a list of
-   separate actions stitched together with "and."
-2. **Two-operations rule.** If a function's contract names two or more
-   operations joined by "and," check whether they are actually one
-   responsibility described in two clauses, or genuinely two
-   responsibilities that should be split. Use this discriminating example:
+1. **A contract describing two distinct operations.** Judge the
+   operations themselves, not the presence of the word "and" — a
+   contract can use "and" and still describe a single responsibility.
+   Use this discriminating example:
 
    > "validates the input and returns the parsed record" is one responsibility; "writes the record to disk and sends a notification email" is two
-3. **Excessive parameter count.** A signature with a large number of
-   positional or keyword parameters (roughly five or more, especially
-   several of the same type) is a sign the function is doing too much or
-   needs a parameter object / config dataclass.
-4. **Deep nesting implied by the described control flow.** If a module
-   description or pseudo-code outlines several levels of nested
-   conditionals or loops, flag it as a candidate for early returns, guard
-   clauses, or extraction into helper functions.
-5. **Unclear or overloaded naming in the design.** Module, class, and
-   function names in the document should say what they do. A name that is
-   generic (`Manager`, `Helper`, `process`, `handle`), or that implies one
-   thing while the contract describes another, should be flagged so it can
-   be fixed before code exists.
+2. **A function name that does not clearly describe what the function
+   does.** A name that is generic (`Manager`, `Helper`, `process`,
+   `handle`), or that implies one thing while the contract describes
+   another, should be flagged so it can be fixed before code exists.
+3. **A public function without type annotations.** A public function's
+   signature in the design document should show parameter and return
+   types; a public signature with untyped parameters or an untyped return
+   value is visible at plan stage and should be flagged.
+4. **A public function without a docstring.** A public function's
+   contract should be stated as a docstring-style description covering
+   what it does, its arguments, and its return value; a public function
+   whose design entry has no such description should be flagged.
+5. **A class doing more than one thing.** A class's stated
+   responsibilities should cohere around a single purpose; if the design
+   document describes a class taking on multiple unrelated
+   responsibilities, flag it as a candidate for splitting into separate
+   classes. This is class-scoped, distinct from the two-operations rule
+   above, which is function-scoped.
 
 ## Post-implementation only — do not flag at plan stage
 
