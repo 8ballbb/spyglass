@@ -234,7 +234,7 @@ No HIL of its own. If S1 fires, the report is evidence at HIL-7. If nothing fire
 
 ### Phase 11 — Artefact Update — Required
 
-No agent; main instance. Content is confirmed at HIL-9 **before any write**. See Artefact Formats for the status vocabularies, templates, and file contents.
+No agent; main instance. Content is confirmed at HIL-9 **before any write**. Read `artefact-formats.md` before writing anything — it carries the status vocabularies, templates, and file contents.
 
 → **HIL-9**
 

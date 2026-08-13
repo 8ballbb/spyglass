@@ -92,3 +92,28 @@ reason:        User's stated reason, or "no reason given"
 ## Feature slug consistency
 
 At HIL-1, always show the generated slug alongside existing ones, so a re-phrased task can be pointed at the folder it belongs to. Consistency comes from explicit confirmation, not algorithmic matching.
+
+## Context Handoff Contract
+
+Not a literal data structure — what must appear explicitly in each agent's prompt so context is not silently dropped across agent boundaries. The main Claude instance carries it forward.
+
+```
+task_description       string    Original user task
+artefact_dir           path      Resolved in Phase 1
+feature_slug           string    Confirmed at HIL-1
+fast_path              enum      none | fast-path-modify | fast-path-add
+module_design          object    Phase 4a Level 1 (confirmed at HIL-2)
+patterns               object    Codebase conventions confirmed at HIL-2
+pseudocode_doc_path    path      <artefact_dir>/<slug>/pseudocode.md
+scope                  enum      single-session | multi-session (confirmed at HIL-4)
+current_sub_task       string    What we are implementing this session
+prior_plans            list      Relevant artefacts confirmed at HIL-1
+library_recommendation object    Phase 6 synthesis (approved at HIL-5)
+style_violations       list      Phase 7 findings (resolved at HIL-6)
+complexity_report      object    Phase 8 findings (if run)
+refactor_signals       list      Fired signals — each {id, source_phase, evidence}
+adopted_refactors      list      Selected at HIL-7 — each {recommendation, order, risk}
+user_overrides         list      Entries of {hil, recommended, chosen, reason}
+```
+
+The per-phase **Receives** lines in `SKILL.md` cover most of this inline. The consolidated list matters most for the fields that cross many agent boundaries — `fast_path`, `prior_plans`, `current_sub_task`, and `user_overrides` — which are easy to drop precisely because no single phase owns them.
