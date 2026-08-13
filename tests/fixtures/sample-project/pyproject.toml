@@ -1,0 +1,7 @@
+[project]
+name = "dataflow"
+version = "0.1.0"
+dependencies = ["python-dateutil>=2.8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
