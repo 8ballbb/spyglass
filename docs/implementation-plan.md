@@ -10,7 +10,7 @@
 
 **Tech Stack:** Markdown with YAML frontmatter, JSON manifests, git. Python 3 only for validating JSON and as the fixture project's language. `radon` optionally for one agent, never required.
 
-**Source spec:** `/Users/andrewpoole/.claude/docs/superpowers/specs/2026-08-12-python-design-skill-design.md` — moved into the repo at `docs/design-spec.md` in Task 11. Cited below as **spec:NNN** for line numbers.
+**Source spec:** now in this repo at [`docs/design-spec.md`](design-spec.md), moved there in Task 11. Cited below as **spec:NNN** for line numbers, which refer to the spec as it stood during the build.
 
 ## Global Constraints
 
