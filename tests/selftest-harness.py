@@ -28,14 +28,18 @@ sys.modules["harness"] = h
 spec.loader.exec_module(h)
 
 
-def stream(*blocks: dict) -> str:
-    """Build a stream-json payload the way the CLI emits one."""
+def stream(*blocks: dict, parent: str | None = None) -> str:
+    """Build a stream-json payload the way the CLI emits one.
+
+    `parent` sets parent_tool_use_id, which is how the CLI marks sub-agent
+    traffic — text an agent emitted, not text the user was shown.
+    """
     lines = []
     for b in blocks:
-        lines.append(json.dumps({
-            "session_id": "sess-123",
-            "message": {"content": [b]},
-        }))
+        ev = {"session_id": "sess-123", "message": {"content": [b]}}
+        if parent:
+            ev["parent_tool_use_id"] = parent
+        lines.append(json.dumps(ev))
     return "\n".join(lines)
 
 
@@ -74,6 +78,14 @@ b, _ = h.harvest(stream(text("turn two")))
 joined = a + b
 expect("visible concatenates", "turn one" in joined.visible and "turn two" in joined.visible, True)
 expect("full concatenates", "turn one" in joined.full and "turn two" in joined.full, True)
+
+print("\nsub-agent traffic is not user-visible")
+sub, _ = h.harvest(stream(
+    text("Full contract and Level 1 plan are below, weigh the reports."),
+    parent="toolu_abc"))
+expect("sub-agent text excluded from visible", "Level 1" in sub.visible, False)
+expect("sub-agent text kept in full", "Level 1" in sub.full, True)
+expect("sub-agent jargon is not a leak", h.check_no_jargon(sub, None).ok, True)
 
 print("\ncheck_no_jargon — grades only what the user saw")
 clean, _ = h.harvest(stream(

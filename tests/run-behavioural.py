@@ -291,17 +291,26 @@ def harvest(stream: str) -> tuple[Transcript, str | None]:
         except json.JSONDecodeError:
             continue
         session = ev.get("session_id", session)
+        # Sub-agent traffic carries parent_tool_use_id. Its text is agent-to-agent
+        # — dispatch prompts and reports — and no user ever reads it. Counting it
+        # as user-visible flagged a synthesiser prompt saying "Level 1 plan below"
+        # as a language leak, which is the harness failing the plugin for its own
+        # internal wiring.
+        from_subagent = bool(ev.get("parent_tool_use_id"))
         msg = ev.get("message") or {}
         content = msg.get("content")
         if isinstance(content, str):
             parts.append(content)
+            if not from_subagent:
+                spoken.append(content)
         elif isinstance(content, list):
             for block in content:
                 if not isinstance(block, dict):
                     continue
                 if block.get("type") == "text":
-                    spoken.append(block.get("text", ""))
                     parts.append(block.get("text", ""))
+                    if not from_subagent:
+                        spoken.append(block.get("text", ""))
                 elif block.get("type") == "tool_use":
                     parts.append(f"[tool:{block.get('name')}] "
                                  + json.dumps(block.get("input", {}))[:400])
