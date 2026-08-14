@@ -388,6 +388,10 @@ The original ten checkpoints all confirm something *Spyglass* produced — the n
 
 That was the right instinct and it was undefined — so it would happen whenever the model noticed and silently not happen when it did not. HIL-1b makes it a defined, conditional checkpoint with a narrow trigger, a one-question limit, and a requirement that options be grounded in code actually read. Designing the wrong thing correctly is the most expensive failure in this flow; every later phase compounds it.
 
+**Revised after the `ambiguous` behavioural case.** Grounding alone was not enough. Asked to "add a function to clean up dates" against a codebase containing `normalise_date`, the checkpoint fired correctly and every option was grounded in real code — and every option still built something: handle messier input, add a batch version, or something else. Three good questions about which new function to write, in a situation where the honest first answer was that the existing one may already be the answer.
+
+The checkpoint had inherited the shape of its own worked example, whose options were also all constructive. So HIL-1b now requires **"use it as it is and write nothing"** as an explicit option, in those words, listed first — and the example demonstrates it rather than contradicting it. "Extend it" is not a substitute: it still produces work.
+
 
 Each checkpoint presents a specific question and waits for user input. Checkpoints are not optional.
 

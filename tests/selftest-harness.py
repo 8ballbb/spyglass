@@ -204,6 +204,41 @@ expect("ungrounded question fails",
 expect("a single-turn run fails rather than passing vacuously",
        h.check_clarified_before_designing(opening, None).ok, False)
 
+print("\ncheck_offered_doing_nothing — 'you may not need this' has to be on the menu")
+offered, _ = h.harvest(stream(text(
+    "There's already a normalise_date. Options: extend it, add a batch wrapper, "
+    "or use it as-is and write nothing new.")))
+expect("offering the existing function passes",
+       h.check_offered_doing_nothing(opening + offered, None).ok, True)
+
+# The real second turn from the first live run of this case: three good,
+# grounded options, every one of which builds something.
+all_build, _ = h.harvest(stream(text(
+    "There's already a normalise_date in timeutils.py. A couple of ways this "
+    "could go: 1. something that handles messier input than normalise_date "
+    "currently does. 2. a batch version. 3. something else entirely.")))
+expect("options that all build something fails",
+       h.check_offered_doing_nothing(opening + all_build, None).ok, False)
+
+expect("never surfacing the existing function fails",
+       h.check_offered_doing_nothing(opening + invented, None).ok, False)
+
+print("\ncheck_artefacts_in_home — the directory, self-ignoring, not a feature folder")
+import tempfile
+
+sandbox = Path(tempfile.mkdtemp(prefix="selftest-home-"))
+h.HOME_ARTEFACTS = sandbox / "spyglass"
+expect("missing directory fails", h.check_artefacts_in_home(None, None).ok, False)
+
+h.HOME_ARTEFACTS.mkdir(parents=True)
+expect("created but exposed to git fails", h.check_artefacts_in_home(None, None).ok, False)
+
+(h.HOME_ARTEFACTS / ".gitignore").write_text("*\n")
+# No feature folder yet — a run stopped at the opening checkpoint has not
+# written one, and demanding it failed a run that behaved correctly.
+expect("self-ignoring directory alone passes",
+       h.check_artefacts_in_home(None, None).ok, True)
+
 print("\ncheck_said_no_project — notes the user cannot find are notes they have lost")
 told, _ = h.harvest(stream(text(
     "There's no Python project here, so I'll keep these notes in ~/.claude/spyglass.")))

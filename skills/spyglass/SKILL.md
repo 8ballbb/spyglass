@@ -375,15 +375,19 @@ Every other checkpoint confirms something **Spyglass** produced. This one is dif
 
 **Ask exactly one question.** This is not a requirements interview. If two things are unclear, ask about the one that changes the design most; the rest will surface at the plan.
 
-**Ground every option in what is actually there.** Vague options produce vague answers. If an existing function plausibly already does the job, **that must be one of the options**, stated plainly — the user may not need the new code at all, and finding that out for the cost of one question is the best outcome this skill can produce.
+**Ground every option in what is actually there.** Vague options produce vague answers.
+
+**If existing code plausibly already does the job, "use it as it is and write nothing" must be one of the options, in those words.** Not "extend it", not "a version that handles more" — those still build something. A set of options that all build something has already answered the only question worth asking, and asked the user to pick a flavour. The user may not need the new code at all, and finding that out for the price of one question is the best outcome this skill can produce.
 
 **Example of the shape** — offered because the codebase was read, not invented:
 
 > There's already a `normalise_date` in `src/dataflow/timeutils.py` that converts loose date strings to ISO-8601. What should the new function take?
 >
-> - **Unix epoch strings** — e.g. `"1700000000"`; genuinely different from what `normalise_date` handles
-> - **The same loose date strings** — in which case this is probably extending `normalise_date` rather than writing anything new
+> - **The same loose date strings** — then `normalise_date` already does this; use it as it is and we're done here
+> - **Unix epoch strings** — e.g. `"1700000000"`; genuinely different from what `normalise_date` handles, so this is new code
 > - **Something else** — tell me the format
+
+Note which option comes first. Doing nothing is the cheapest outcome available, so it is offered first, not buried under the alternatives that make work.
 
 **Wait for:** an answer. Do not proceed to module design on an assumption.
 

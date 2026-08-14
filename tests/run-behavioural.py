@@ -33,6 +33,9 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 FIXTURE = REPO / "tests/fixtures/sample-project"
 RESET = REPO / "tests/reset-fixture.sh"
+# Where notes go when there is no project at all. Module-level so the self-test
+# can point it at a temp directory and prove the check fails when it should.
+HOME_ARTEFACTS = Path.home() / ".claude/spyglass"
 
 # Internal vocabulary that must never reach a user. Sourced from the
 # "Speaking to the User" section of SKILL.md.
@@ -307,13 +310,55 @@ def check_clarified_before_designing(t: "Transcript", _) -> Result:
                   "grounded in " + ", ".join(real))
 
 
+def check_offered_doing_nothing(t: "Transcript", _) -> Result:
+    """"You may not need this" has to be on the menu.
+
+    A clarifying question whose every option builds something has already decided
+    the interesting question. When existing code plausibly covers the job, using
+    it unchanged must be offered explicitly — finding that out for the price of
+    one question is the best outcome available here, and it is not reachable if
+    it was never an option.
+    """
+    steps = t.steps
+    if len(steps) < 2:
+        return Result("offered using what already exists", False,
+                      "run had fewer than two turns")
+    step = steps[1]
+    if "normalise_date" not in step.full:
+        return Result("offered using what already exists", False,
+                      "never surfaced the existing function at all")
+    offered = re.search(
+        r"\b(as[- ]is|as it stands|unchanged|already (does|covers|handles|enough)|"
+        r"nothing new|no new (code|function)|don'?t need (to write|a new|anything)|"
+        r"do not need (to write|a new)|use (it|normalise_date) directly|"
+        r"just use (it|normalise_date)|this is already done)\b",
+        step.full, re.I)
+    return Result("offered using what already exists", bool(offered),
+                  "" if offered else
+                  "every option builds something new — 'you may not need this' was never offered")
+
+
 def check_artefacts_in_home(_t, _) -> Result:
-    """No project, no marker — notes belong in the home fallback, not in cwd."""
-    home = Path.home() / ".claude/spyglass"
-    entries = [p.name for p in home.iterdir()
-               if p.is_dir()] if home.is_dir() else []
-    return Result("fell back to ~/.claude/spyglass", bool(entries),
-                  "wrote nothing there" if not entries else "created " + ", ".join(entries))
+    """No project, no marker — notes belong in the home fallback, not in cwd.
+
+    Asserts the directory and its self-ignoring .gitignore, not a feature folder:
+    this case stops at the opening checkpoint, and the feature folder is not
+    written until the run finishes. An earlier version demanded the folder and
+    failed a run that had done exactly the right thing.
+
+    The .gitignore is worth asserting in its own right — ~/.claude is sometimes
+    kept under version control, and design notes are not something to commit to
+    someone's dotfiles by surprise.
+    """
+    if not HOME_ARTEFACTS.is_dir():
+        return Result("fell back to ~/.claude/spyglass", False, "never created it")
+    ignore = HOME_ARTEFACTS / ".gitignore"
+    if not ignore.is_file() or "*" not in ignore.read_text():
+        return Result("fell back to ~/.claude/spyglass", False,
+                      "created it, but left it exposed to git")
+    listing = sorted(p.name for p in HOME_ARTEFACTS.iterdir())
+    return Result("fell back to ~/.claude/spyglass", True,
+                  "self-ignoring; holds " + ", ".join(listing))
 
 
 def check_said_no_project(t: "Transcript", _) -> Result:
@@ -450,6 +495,7 @@ CASES = [
         checks=[
             check_no_jargon,
             check_clarified_before_designing,
+            check_offered_doing_nothing,
             check_gitignore_untouched,
             check_no_implementation,
         ],
