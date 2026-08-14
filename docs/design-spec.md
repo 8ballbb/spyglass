@@ -58,8 +58,8 @@ Derived from each path's run list, counting one agent per agent-backed phase. Ph
 
 | Path | Agents spawned | Which |
 |---|---|---|
-| `fast-path-modify` | 3–4 | scope-assessor, style-checker, complexity-assessor, + refactor-assessor if a signal fires |
-| `fast-path-add` | 5–6 | scope-assessor, codebase-searcher, stdlib-searcher, synthesiser, style-checker, + refactor-assessor if a signal fires |
+| `fast-path-modify` | 2–3 | style-checker, complexity-assessor, + refactor-assessor if a signal fires |
+| `fast-path-add` | 5–6 | codebase-searcher, stdlib-searcher, deps-searcher, synthesiser, style-checker, + refactor-assessor if a signal fires |
 | Standard, no conditionals, no signals | 7 | scope-assessor, 4 searchers, synthesiser, style-checker |
 | Standard with pattern analysis and complexity assessment | 9 | the above + pattern-analyzer, complexity-assessor |
 | Everything including refactor and test planning | 11 | all |

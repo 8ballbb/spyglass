@@ -78,22 +78,31 @@ Do not explain the self-ignoring mechanism, and do not volunteer that their `.gi
 
 Evaluated **before Phase 1**, from the task description alone. Two variants, distinguished by whether the task adds new capability or changes existing behaviour — library investigation only pays off for the former.
 
+**Both fast paths run exactly two checkpoints**, not four. A path that exists to be light must feel light: a change this small does not warrant four stops, and checkpoints that carry no real decision train the user to stop reading the ones that do.
+
+- **Phase 2b and HIL-4 are skipped.** A task that matched a fast path is single-session by definition — asking a scope assessor to confirm that one function fits in one session is a formality with a predetermined answer.
+- **HIL-2 is folded into HIL-3.** Present the file-level structure and the contract together in one checkpoint. On a one-function change the structure question is "which file does this go in", which the plan answers anyway.
+
+That leaves: the opening checkpoint (name, prior work, size), then one combined plan checkpoint. Everything else runs without interruption.
+
 **`fast-path-modify`** — changes existing behaviour, introduces no new capability (add a parameter, fix an off-by-one, rename a symbol, adjust a threshold).
 - Criteria: under 15 words AND names an existing function, class, or file AND introduces no new capability
-- Skips: Phases 3, 5, 6, 10 and their HIL checkpoints — but **HIL-2 still runs**, on the Level 1 summary alone
-- Runs: 1, 2a, 4a, 4b, 2b, 7, 8, 9 (if signals fire), 11, 12
+- Skips: Phases 2b, 3, 5, 6, 10 and HIL-2, HIL-4
+- Runs: 1, 2a, 4a, 4b, 7, 8, 9 (if signals fire), 11, 12
 - Rationale: nothing new is being built, so there is nothing to investigate — but the code being touched may still warrant refactoring, so Phases 8 and 9 stay live
 
 **`fast-path-add`** — adds a small new capability (one function, one small class).
 - Criteria: under 15 words AND describes a single new function or small class
-- Skips: Phases 3, 8, 10 and their HIL checkpoints — but **HIL-2 still runs**, on the Level 1 summary alone
-- Runs: 1, 2a, 4a, 4b, 2b, **reduced Phase 5**, 6, 7, 9 (if signals fire), 11, 12
-- **Reduced Phase 5 dispatches only `spyglass:codebase-searcher` and `spyglass:stdlib-searcher`.** `spyglass:deps-searcher` and `spyglass:package-searcher` are skipped: adding a dependency for a trivial function is almost never right
+- Skips: Phases 2b, 3, 8, 10 and HIL-2, HIL-4
+- Runs: 1, 2a, 4a, 4b, **reduced Phase 5**, 6, 7, 9 (if signals fire), 11, 12
+- **Reduced Phase 5 dispatches `spyglass:codebase-searcher`, `spyglass:stdlib-searcher`, and `spyglass:deps-searcher`.** Only `spyglass:package-searcher` is skipped.
 - Rationale: "write a function that slugifies a string" is short *and* is exactly where reimplementation happens
+
+**Why `deps-searcher` runs even on the fast path.** It does not propose new dependencies — it reports what the project has *already installed*. Those are paid for: no new supply-chain surface, no new licence, nothing added to a lockfile. A project that already depends on a mature date parser should never be handed a hand-rolled format loop because nobody looked. Only `package-searcher`, which proposes genuinely new dependencies, is worth skipping for a task this small.
 
 **Tell the user what it means for them, not which variant fired.** One clause is enough — "this looks small, so I'll keep the design pass light". Never name the variant, list the skipped phases, or explain the criteria that matched; see **Speaking to the User**.
 
-If neither matches, run the standard flow. When Phase 3 is skipped, Phase 4b follows Phase 4a directly as one planning step — with HIL-2 still between them, confirming the module structure without a pattern report.
+If neither matches, run the standard flow.
 
 ## Phase Flow
 
@@ -106,7 +115,7 @@ Phase 3  — Pattern analysis        [Conditional] Targets directories named in 
            └─ HIL-2 [Required]: confirm L1 summary + patterns (L1 alone if Phase 3 skipped)
 Phase 4b — Contract + signature    [Required]    Levels 2-3, constrained by patterns
            └─ HIL-3: approve full plan → saved to pseudocode.md
-Phase 2b — Scope re-check          [Required]    Judge scope against the actual plan
+Phase 2b — Scope re-check          [Standard]    Judge scope against the actual plan (skipped on fast paths)
            └─ HIL-4: confirm scope and sub-task breakdown
 Phase 5  — Library investigation   [Required]    4 agents in parallel (blocks until all complete)
 Phase 6  — Investigation synthesis [Required]    use / partial / scratch recommendation
@@ -141,7 +150,7 @@ No agent; main instance. Resolve the artefact directory (above), then: (1) read 
 
 ### Phase 2a — Lightweight Scope Check — Required
 
-No agent; main instance, from the task description alone. Emits one signal: `trivial` | `small` | `medium` | `large` | `multi-session-likely`. A signal, not a decision — the binding scope decision is HIL-4, after the plan exists.
+No agent; main instance, from the task description alone. Emits one signal: `trivial` | `small` | `medium` | `large` | `multi-session-likely`. A signal, not a decision — on the standard flow the binding scope decision is HIL-4, after the plan exists. On a fast path this signal is the only scope judgment made.
 
 → batched into **HIL-1**
 
@@ -188,7 +197,9 @@ Plus class skeletons with `__init__`, public methods, and `@property` definition
 
 → **HIL-3**
 
-### Phase 2b — Scope Re-check — Required — `spyglass:scope-assessor`
+### Phase 2b — Scope Re-check — Standard flow only — `spyglass:scope-assessor`
+
+**Not run on either fast path.** A task that matched a fast path is single-session by definition.
 
 **Receives:** task description + approved `pseudocode.md` (Levels 1–2). **Output:** `scope`; `sub_tasks` (ordered, if multi-session); `current_task`; `rationale`.
 
@@ -337,23 +348,31 @@ This is the first thing the user ever sees. Follow **Speaking to the User** exac
 
 ### HIL-2 (batched) — Module design and patterns *(after Phases 4a and 3)*
 
-**Present:** a brief Level 1 summary — files to be created or modified and each one's responsibility — plus the pattern report with confidence levels.
+**Present:** which files will be created or modified and what each is for, plus the conventions found in those directories.
 
-**Ask:** "Here's the module structure I'm planning and the conventions I found in those directories. Does the structure look right, and are these patterns accurate?"
+**Ask:** whether the structure looks right and whether those conventions are accurate.
 
-**Wait for:** confirmation or correction of both. Module-design corrections send Phase 4a back for revision before Phase 4b. Pattern corrections are authoritative and become hard constraints on Phase 4b.
+**Wait for:** confirmation or correction of both. Structure corrections send Phase 4a back for revision before Phase 4b. Convention corrections are authoritative and become hard constraints on Phase 4b.
 
-**When Phase 3 did not run** — a greenfield directory with no Python files, or either fast path — **HIL-2 still happens.** Only the pattern half drops. Present the Level 1 summary alone, say plainly why there is no pattern report ("no existing Python in the target directories" or "fast path"), and ask only: "Does the module structure look right?" This checkpoint is the sole confirmation the Level 1 module design ever gets, and Level 1 is what Phase 4b builds every contract on — skipping it would send an unconfirmed structure all the way to HIL-3.
+**Skipped entirely on both fast paths** — folded into HIL-3, which presents structure and contract together. See **Fast-path**.
 
-### HIL-3 — Full plan approval *(after Phase 4b)*
+**When Phase 3 did not run on the standard flow** — a greenfield directory with no Python files — HIL-2 still happens with the conventions half dropped. Ask only whether the structure looks right. Do not explain that a pattern report exists and is absent; the user has no use for the machinery, only the question.
 
-**Present:** the complete three-level planning document.
+### HIL-3 — Plan approval *(after Phase 4b)*
 
-**Ask:** "Does this plan look right? Any functions, classes, or modules to add, remove, or redesign before we investigate libraries?"
+**Present** the plan in plain language: for each function or method, what it does, what it expects, what it returns, and how it handles the cases that could go wrong — then the signatures. **Do not label these as "Level 2" and "Level 3", or mention levels at all.** Those are internal names for the stages of writing the plan, not headings for the user. See **Speaking to the User**.
+
+**On a fast path**, open with the file-level structure that HIL-2 would otherwise have covered, then the plan itself — one checkpoint, not two.
+
+**Ask:** whether the plan looks right, and whether anything should change before checking what already exists to build it with.
 
 **Wait for:** explicit approval or change requests. Do not proceed until approved — a wrong plan wastes all downstream agent work. `pseudocode.md` is written **on approval**, not before.
 
+**If you notice a likely overlap with existing code while writing the plan**, you may mention it here — it is useful for the user to learn it early. State it as an observation you are about to check, never as a result: "this looks close to `normalise_date`; I'll confirm when I check what already exists." Do not predict what the reuse search will conclude, and do not let the observation shape the plan before it is confirmed.
+
 ### HIL-4 — Final scope and sub-task breakdown *(after Phase 2b)*
+
+**Skipped entirely on both fast paths**, along with Phase 2b itself. See **Fast-path**.
 
 **Present:** the scope judgment against the actual plan; if multi-session, the ordered sub-task list and which to implement now.
 
