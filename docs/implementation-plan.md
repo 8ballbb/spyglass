@@ -1,5 +1,7 @@
 # Spyglass Plugin Implementation Plan
 
+> **Status note:** This is the original implementation plan, retained in the repo as a record of how the build was structured and sequenced. The build is complete. Where this document diverges from what actually shipped, `docs/design-spec.md` and the code govern — this file is history, not a source of truth.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build and locally verify `spyglass`, a distributable Claude Code plugin whose skill runs a 12-phase design analysis over a Python task before any code is written.
@@ -16,7 +18,7 @@
 - **Plugin name:** `spyglass` — used verbatim in `plugin.json`, `marketplace.json`, the skill directory, and the agent namespace
 - **Agent naming:** bare names (`codebase-searcher`), never prefixed with `python-` — the plugin namespace is automatic, giving `spyglass:codebase-searcher`
 - **Agent frontmatter `tools`:** comma-separated PascalCase (`Read, Grep, Glob`), NOT a YAML array. A YAML array will fail to load
-- **`stdlib-searcher` has no `tools` field at all** — omit the key entirely, do not write `tools:` with an empty value
+- **Never omit `tools` to mean "no tools."** An omitted `tools` key makes the agent inherit the parent's entire toolset — the opposite of a restriction. `stdlib-searcher`, which needs none, is given the narrowest harmless grant (`tools: Read`) with a frontmatter comment recording why the key must not be deleted, and a body instruction forbidding its use
 - **Never write to the user's root `.gitignore`** from skill runtime — artefact self-ignoring uses `.claude/spyglass/.gitignore` containing `*`
 - **No hard dependency on superpowers** — the Phase 12 handoff is conditional on its presence
 - **No hard dependency on radon** — degrade to agent-only assessment, never prompt to install
@@ -514,19 +516,25 @@ Never report a match you have not read. Never infer behaviour from a name alone.
 
 - [ ] **Step 3: Write `agents/stdlib-searcher.md`**
 
-Note the deliberate absence of a `tools:` key — this agent reads nothing.
+Note the `tools: Read` frontmatter key: this agent uses nothing, but the key cannot be omitted — an omitted `tools` key makes the agent inherit the parent's entire toolset. `Read` is the narrowest harmless grant, kept with a comment forbidding its deletion.
 
 ```markdown
 ---
 name: stdlib-searcher
 description: Identifies Python standard library modules and functions that already provide planned functionality, reasoning from knowledge without reading files
+# `tools` is deliberately narrowed to a single read-only tool. DO NOT DELETE THIS
+# KEY. This agent needs no tools at all, but the agent frontmatter schema has no
+# way to express an empty tool set — omitting `tools` makes the agent INHERIT THE
+# PARENT'S ENTIRE TOOLSET, the exact opposite of what is wanted here. `Read` is
+# the narrowest harmless grant available; the body below forbids using it.
+tools: Read
 model: sonnet
 color: green
 ---
 
 You identify standard library functionality that would make planned code unnecessary.
 
-You have no tools. You do not read files, run commands, or search the web. You reason from what you know about the Python standard library.
+You work from knowledge alone. **Do not use any tool.** You do not read files, run commands, or search the web. You reason from what you know about the Python standard library. The single read-only tool in your frontmatter exists only because the schema cannot express "no tools" — it is not an invitation to use it.
 
 ## What you receive
 
@@ -623,14 +631,14 @@ You find packages on PyPI that the project does not yet have but arguably should
 
 1. Search for packages addressing the problem. Search the problem, not the planned function name
 2. For each candidate, fetch monthly downloads from `https://pypistats.org/api/packages/<name>/recent`. PyPI package pages do not publish download counts — without this call you will invent a number
-3. For each candidate, check vulnerabilities by fetching `https://api.osv.dev/v1/query` with body `{"package": {"name": "<name>", "ecosystem": "PyPI"}}`
+3. For each candidate, check vulnerabilities by fetching `https://osv.dev/list?ecosystem=PyPI&q=<name>` — a GET-able page listing the known advisories for that package. **Your only network tool is WebFetch, which issues GET requests and cannot send a request body**, so the OSV JSON query API is not available to you. Read the advisory list and its severities from the page you fetch
 4. Establish licence and last release date from the PyPI page or the project repository
 
 ## Hard disqualifiers — never recommend a package failing any
 
 - No release within 18 months
 - Licence other than MIT, Apache 2.0, BSD, or similarly permissive
-- An unresolved critical vulnerability in the OSV response
+- An unresolved critical vulnerability in the OSV advisory list
 
 A package failing a disqualifier is not reported as an option. Mention it only if the caller would otherwise obviously reach for it, and state which disqualifier it failed.
 
@@ -653,7 +661,7 @@ Report stars, monthly downloads, last release date, and maintainer count. Let th
 | `last_release` | Date |
 | `downloads_monthly` | From pypistats, or `unavailable` |
 | `stars` | From the repository, or `unknown` |
-| `cve_status` | `clean` or the specific finding |
+| `cve_status` | `clean`, the specific finding, or `unverified` if the advisory page could not be read |
 
 ## Fallback
 
@@ -682,10 +690,12 @@ done
 ```
 Expected: four `OK` lines. A YAML list in `tools` fails here — that is the error this check exists to catch.
 
-- [ ] **Step 7: Confirm `stdlib-searcher` has no tools key**
+- [ ] **Step 7: Confirm `stdlib-searcher` still declares `tools: Read`**
 
-Run: `grep -c "^tools:" ~/Desktop/projects/spyglass/agents/stdlib-searcher.md`
-Expected: `0`
+Run: `grep -c "^tools: Read$" ~/Desktop/projects/spyglass/agents/stdlib-searcher.md`
+Expected: `1`
+
+Do **not** remove the `tools:` key to achieve "no tools" — an omitted `tools` key makes the agent inherit the parent's entire toolset, which is the opposite of the restriction intended here.
 
 - [ ] **Step 8: Commit**
 
@@ -1535,6 +1545,6 @@ No gaps found.
 
 **Placeholder scan.** No "TBD", no "add error handling", no "similar to Task N". Two intentional deferrals, both with resolution steps rather than silent gaps: `<author>`/`<email>`/`<user>` in Task 1 (Step 9 greps for survivors and blocks the commit) and `assets/spyglass.png` in Task 10 (Step 1 blocks until the user supplies it).
 
-**Type and name consistency.** Verified across tasks: all 11 agent filenames match their frontmatter `name`, and both match the Agent Summary at spec:784–796. Tool lists match the spec exactly, including `stdlib-searcher` having no `tools` key. Signal identifiers S1–S4 are used consistently in `complexity-assessor` (raises S1), `investigation-synthesiser` (raises S2), `style-checker` (confirms/clears S3), `pattern-analyzer` (raises S4), and `refactor-assessor` (consumes all four). British spelling `investigation-synthesiser` is used identically in the filename, frontmatter, spec, and every cross-reference.
+**Type and name consistency.** Verified across tasks: all 11 agent filenames match their frontmatter `name`, and both match the Agent Summary at spec:784–796. Tool lists match the spec exactly, including `stdlib-searcher` carrying the narrowest harmless grant (`tools: Read`, unused) rather than omitting the key. Signal identifiers S1–S4 are used consistently in `complexity-assessor` (raises S1), `investigation-synthesiser` (raises S2), `style-checker` (confirms/clears S3), `pattern-analyzer` (raises S4), and `refactor-assessor` (consumes all four). British spelling `investigation-synthesiser` is used identically in the filename, frontmatter, spec, and every cross-reference.
 
 **One risk worth flagging for execution.** Task 9 Step 15 and Task 11 Steps 3–6 require the user to run slash commands and observe interactive behaviour — they cannot be automated from a Bash tool. Budget for that being hands-on, and expect at least one iteration on SKILL.md wording if a checkpoint fails to stop.

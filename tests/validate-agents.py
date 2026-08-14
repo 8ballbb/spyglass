@@ -50,11 +50,12 @@ def check(path: Path, skill_text: str) -> list[str]:
         errors.append("missing 'description:'")
 
     tools = fields.get("tools")
-    if tools is not None:
-        if tools.startswith("["):
-            errors.append(f"'tools' is a YAML array ({tools}); use a comma-separated string")
-        elif not re.fullmatch(r"[A-Za-z_][\w:-]*(\s*,\s*[A-Za-z_][\w:-]*)*", tools):
-            errors.append(f"'tools' is not a comma-separated tool list: {tools!r}")
+    if tools is None:
+        errors.append("missing 'tools:' key (omitting it makes the agent inherit every tool)")
+    elif tools.startswith("["):
+        errors.append(f"'tools' is a YAML array ({tools}); use a comma-separated string")
+    elif not re.fullmatch(r"[A-Za-z_][\w:-]*(\s*,\s*[A-Za-z_][\w:-]*)*", tools):
+        errors.append(f"'tools' is not a comma-separated tool list: {tools!r}")
 
     if name and f"spyglass:{name}" not in skill_text:
         errors.append(f"never referenced as 'spyglass:{name}' in SKILL.md")

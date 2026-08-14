@@ -50,7 +50,7 @@ Report stars, monthly downloads, last release date, and maintainer count. Let th
 | `last_release` | Date |
 | `downloads_monthly` | From pypistats, or `unavailable` |
 | `stars` | From the repository, or `unknown` |
-| `cve_status` | `clean` or the specific finding |
+| `cve_status` | `clean`, the specific finding, or `unverified` if the advisory page could not be read |
 
 ## Fallback
 
