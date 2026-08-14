@@ -15,16 +15,58 @@ Structured design analysis before any Python implementation. It prevents reimple
 
 **Invocation keywords** — recognised in the invocation text, not CLI flags: `--tests` forces test planning (Phase 10); `--refactor` forces refactor assessment even when no signal fires; `--no-refactor` suppresses it even when signals fire; `--complete <feature-slug>` marks a feature complete and writes its summary. Scope: Python projects only.
 
+## Speaking to the User
+
+Everything in this document below this section — phase numbers, HIL numbers, Levels, slugs, signals, fast-path variants — is **internal vocabulary for running the process**. None of it belongs in a message to the user. They did not read this file and have no idea what "HIL-2" or "Level 1" means.
+
+**Rules for every user-facing message:**
+
+1. **No internal names.** Never write `HIL-3`, `Phase 4b`, `Level 1`, `fast-path-add`, `S2`, `slug`, or `artefact` to the user. Say *checkpoint*, *the plan*, *the structure*, *a name for this work*, *notes*.
+2. **Do not quote their own request back to them.** They know what they asked for. Never justify a decision by restating their words or citing a rule they cannot see — not "the task is under 15 words and describes a single new function", just "this looks small".
+3. **Do not explain the machinery.** Which phases run, why a rule fired, how a path resolved — all irrelevant unless something they need to act on depends on it. Report the outcome, not the derivation.
+4. **Do not pre-empt worries they do not have.** Volunteering that a file was *not* modified plants the idea that it might have been.
+5. **Ask for what you need, not for validation of what you did.** A checkpoint is a question with a decision behind it.
+6. **Short.** A checkpoint is a handful of lines. If it needs a heading and five bullets, it is over-explaining.
+
+**This is the shape to aim for:**
+
+<Bad>
+Fast-path: fast-path-add — the task is under 15 words and describes a single new function ("a function that converts a timestamp string to ISO-8601"), not a modification to a named existing symbol. This skips Phases 3, 8, 10 (and their HILs), runs a reduced Phase 5, and still requires HIL-2 on the Level 1 summary alone.
+
+HIL-1 — Slug, prior context, scope signal
+- Generated slug: convert-timestamp-iso8601
+- Artefact directory: /Users/…/.claude/spyglass/ — resolved to the repo root rather than the subfolder because .git was found there and takes precedence per the artefact-resolution rule
+- Lightweight scope signal: trivial/small
+</Bad>
+
+<Good>
+This looks small, so I'll keep the design pass light — I'll check what already exists, then sketch the function before writing it.
+
+I'm calling this work **convert-timestamp-iso8601**. Nothing related from previous sessions. Notes go in `.claude/spyglass/`.
+
+Does that name work, and does "small" match what you expected?
+</Good>
+
+The good version carries every decision the user can actually act on, and none of the reasoning that produced them. When a user needs the reasoning, they will ask.
+
+**One exception:** if a resolution genuinely surprises the user's expectation — the project root landed somewhere they would not predict, or no project was found at all — say so in one plain sentence, because they may need to move and re-run. State the fact, not the rule that produced it.
+
 ## Artefact Directory Resolution
 
-1. Search upward from the working directory for `.git`, `pyproject.toml`, `setup.py`, `setup.cfg`, `requirements.txt`. Prefer the directory containing `.git` when markers appear at multiple levels.
-2. Found → artefact directory is `<project-root>/.claude/spyglass/`.
-3. Not found → artefact directory is `~/.claude/spyglass/`. State this plainly to the user.
+**Nearest marker wins.** Walk upward from the working directory and stop at the **first** directory containing a Python project marker — `pyproject.toml`, `setup.py`, `setup.cfg`, or `requirements.txt`. Only if none is found anywhere above, fall back to the nearest `.git`.
+
+Do **not** prefer `.git` over a nearer Python marker. A Python project nested inside a larger repository — a fixture, an example, a package in a monorepo — is the project the user is working in. Resolving past it to the outer repository points every subsequent phase at the wrong codebase: the reuse search reads unrelated files, and the artefacts land outside the project they describe.
+
+1. Nearest Python marker found → artefact directory is `<that-directory>/.claude/spyglass/`.
+2. No Python marker, but a `.git` above → artefact directory is `<git-root>/.claude/spyglass/`.
+3. Neither → artefact directory is `~/.claude/spyglass/`. Say plainly that no project was found.
 4. If the directory does not exist, create it and write `.gitignore` containing a single line: `*`.
 
-A `.gitignore` whose pattern matches everything, including itself, makes the whole tree invisible to git with **zero modification of any file the user owns**. On the run that creates it, announce once, verbatim except for `<artefact-dir>`, which is substituted with the location actually resolved above — `.claude/spyglass/` in a project, `~/.claude/spyglass/` under the no-project fallback:
+A `.gitignore` whose pattern matches everything, including itself, makes the whole tree invisible to git with **zero modification of any file the user owns**. Mention the location once, on the run that creates it, in one short line — for example:
 
-> Created `<artefact-dir>` for design artefacts. It's self-ignored from git — your `.gitignore` was not modified.
+> Design notes for this will go in `.claude/spyglass/`, kept out of git.
+
+Do not explain the self-ignoring mechanism, and do not volunteer that their `.gitignore` was left alone. Nobody asked, and raising it invites a worry that did not exist.
 
 **Hard rules:**
 
@@ -49,7 +91,9 @@ Evaluated **before Phase 1**, from the task description alone. Two variants, dis
 - **Reduced Phase 5 dispatches only `spyglass:codebase-searcher` and `spyglass:stdlib-searcher`.** `spyglass:deps-searcher` and `spyglass:package-searcher` are skipped: adding a dependency for a trivial function is almost never right
 - Rationale: "write a function that slugifies a string" is short *and* is exactly where reimplementation happens
 
-**Announce which variant applies and why.** If neither matches, run the standard flow. When Phase 3 is skipped, Phase 4b follows Phase 4a directly as one planning step — with HIL-2 still between them, confirming the Level 1 summary without a pattern report.
+**Tell the user what it means for them, not which variant fired.** One clause is enough — "this looks small, so I'll keep the design pass light". Never name the variant, list the skipped phases, or explain the criteria that matched; see **Speaking to the User**.
+
+If neither matches, run the standard flow. When Phase 3 is skipped, Phase 4b follows Phase 4a directly as one planning step — with HIL-2 still between them, confirming the module structure without a pattern report.
 
 ## Phase Flow
 
@@ -273,13 +317,23 @@ Each fired signal is reported at HIL-7 with its evidence, so the user sees *why*
 
 **Each checkpoint waits for user input before proceeding. Checkpoints are not optional. Do not batch, skip, or infer an answer to any checkpoint the user has not given.**
 
-### HIL-1 (batched) — Slug, prior context, scope signal *(after Phases 1 and 2a)*
+### HIL-1 (batched) — Name, prior work, size *(after Phases 1 and 2a)*
 
-**Present** in one message: the generated slug alongside existing slugs; relevant prior artefacts found; the orphaned-state prompt if detected; the artefact directory location if this run created it; the lightweight scope signal.
+This is the first thing the user ever sees. Follow **Speaking to the User** exactly — it sets the tone for the whole run.
 
-**Ask:** "Is this the right feature slug? Should any prior work listed be considered? Does the scope signal match your expectation?"
+**Present** in one short message, in plain language:
+- The name you have chosen for this piece of work, and any existing names it might belong under instead
+- Anything relevant found from previous sessions — or nothing, said in three words
+- Where notes will be kept, one clause, only on the run that creates the directory
+- Whether this looks small or large
+- If an unfinished plan from a previous session was found, offer to resume it or start fresh
+- Only if the project root resolved somewhere surprising, or no project was found: one plain sentence saying so
 
-**Wait for:** slug confirmation or correction; relevance decision; scope confirmation.
+**Ask:** whether the name fits, whether any prior work listed is relevant, and whether the size matches what they expected.
+
+**Wait for:** a name confirmation or correction; a decision on prior work; a size confirmation.
+
+**Do not** print the internal slug format, the resolution rule, the phase list, or which fast-path variant fired. Do not quote their request back.
 
 ### HIL-2 (batched) — Module design and patterns *(after Phases 4a and 3)*
 

@@ -485,7 +485,9 @@ Wait for: an explicit choice. Never begin implementing without one.
 ### Phase 1 — Context Check
 
 **Artefact directory resolution:**
-1. Search upward from the working directory for `.git`, `pyproject.toml`, `setup.py`, `setup.cfg`, `requirements.txt`. Prefer the directory containing `.git` when markers appear at multiple levels.
+1. Walk upward from the working directory and stop at the **first** directory containing a Python project marker — `pyproject.toml`, `setup.py`, `setup.cfg`, `requirements.txt`. Only if none is found anywhere above, fall back to the nearest `.git`.
+
+   **Corrected after behavioural testing.** This spec originally said to prefer `.git` when markers appear at multiple levels. That is wrong. Run from `tests/fixtures/sample-project/` — which has its own `pyproject.toml` — resolution walked past it to the outer repository's `.git` and treated the *plugin repo* as the project. Every downstream phase then pointed at the wrong codebase: the reuse search read unrelated files, the scope signal described modules that were not there, and artefacts landed outside the project they described. A Python project nested inside a larger repository (fixture, example, monorepo package) is the project the user is in. Nearest Python marker wins.
 2. Found → artefact directory is `<project-root>/.claude/spyglass/`.
 3. Not found → artefact directory is `~/.claude/spyglass/`. State this plainly.
 4. If the directory does not exist, create it and write `.gitignore` containing `*`. Announce once (see Git invisibility).
