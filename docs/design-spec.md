@@ -23,13 +23,15 @@ A Claude Code plugin providing a skill that enforces disciplined Python developm
 **Distributed as a plugin** anyone can install. It must therefore work in any repository, under any team's conventions, with zero configuration and no surprising side effects.
 
 **Invocation:**
-- `/spyglass <task description>` — standard run
-- `/spyglass --tests <task description>` — force test planning
-- `/spyglass --refactor <task description>` — force refactor assessment even when no signal fires
-- `/spyglass --no-refactor <task description>` — suppress refactor assessment even when signals fire
-- `/spyglass --complete <feature-slug>` — mark a feature complete and write summary
+- `/spyglass:spyglass <task description>` — standard run
+- `/spyglass:spyglass --tests <task description>` — force test planning
+- `/spyglass:spyglass --refactor <task description>` — force refactor assessment even when no signal fires
+- `/spyglass:spyglass --no-refactor <task description>` — suppress refactor assessment even when signals fire
+- `/spyglass:spyglass --complete <feature-slug>` — mark a feature complete and write summary
 
 These are keywords recognised in the invocation text, not CLI flags.
+
+The `plugin:skill` form is required — see Invocation below. The skill is also model-invoked, so in practice it engages without being typed.
 
 Refactor assessment is **signal-driven by default** — the skill detects when refactoring is warranted and runs the assessment on its own. The two keywords override that judgment in either direction; neither is needed for normal use.
 
@@ -75,8 +77,6 @@ spyglass/
 ├── .claude-plugin/
 │   ├── plugin.json              # plugin manifest
 │   └── marketplace.json         # self-hosted marketplace manifest
-├── commands/
-│   └── spyglass.md              # provides the clean /spyglass entry point
 ├── skills/
 │   └── spyglass/
 │       ├── SKILL.md             # the workflow
@@ -148,21 +148,19 @@ spyglass/
 
 ```
 /plugin marketplace add <user>/spyglass
-/plugin install spyglass
+/plugin install spyglass@spyglass
 ```
 
-### `commands/spyglass.md`
+### Invocation — no command wrapper
 
-A thin command wrapper so users type `/spyglass` rather than `/spyglass:spyglass`. Its body instructs Claude to invoke the skill with the supplied arguments.
+**There is no `commands/` directory, deliberately.** An earlier revision of this spec called for a thin `commands/spyglass.md` wrapper so users could type `/spyglass` instead of `/spyglass:spyglass`. That was wrong on both counts, and behavioural testing on Claude Code 2.1.222 proved it:
 
-```markdown
----
-description: Design-first Python development — plan, investigate reuse, and enforce standards before writing code
-argument-hint: Task description, optionally with --tests, --refactor, --no-refactor, or --complete <slug>
----
+- **`commands/` files are loaded into the skill registry, not a separate command registry.** Verified with a control plugin containing only `commands/ctrlcmd.md` and no `skills/` directory: `claude plugin details` reported `Skills (1) ctrlcmd`. There is no "Commands" line in the component inventory at all.
+- **So the wrapper did not create a command — it created a second skill named `spyglass`,** colliding with the real one in `skills/spyglass/`. `claude plugin details spyglass` showed `Skills (2) spyglass, spyglass`, one costing ~10.8k on-invoke tokens (the real workflow) and one ~90 (the three-line wrapper).
 
-Invoke the `spyglass` skill with the user's arguments and follow it exactly.
-```
+Plugin skills are addressed as `plugin:skill`. Spyglass is therefore invoked as **`/spyglass:spyglass`** — the same shape as `/superpowers:brainstorming`. A bare `/spyglass` never resolves, and no wrapper can make it.
+
+In practice the explicit form is rarely typed: the skill's frontmatter `description` is a model-invoked trigger, so it engages on its own when Python implementation work begins.
 
 ### Agent definition format
 

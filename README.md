@@ -26,20 +26,22 @@ Spyglass produces a design and stops. It never implements on your behalf — imp
 
 ```
 /plugin marketplace add 8ballbb/spyglass
-/plugin install spyglass
+/plugin install spyglass@spyglass
 ```
 
 ## Usage
 
 ```
-/spyglass <task description>              standard run
-/spyglass --tests <task description>       force test planning
-/spyglass --refactor <task description>    force refactor assessment even when no signal fires
-/spyglass --no-refactor <task description> suppress refactor assessment even when signals fire
-/spyglass --complete <feature-slug>        mark a feature complete and write its summary
+/spyglass:spyglass <task description>              standard run
+/spyglass:spyglass --tests <task description>       force test planning
+/spyglass:spyglass --refactor <task description>    force refactor assessment even when no signal fires
+/spyglass:spyglass --no-refactor <task description> suppress refactor assessment even when signals fire
+/spyglass:spyglass --complete <feature-slug>        mark a feature complete and write its summary
 ```
 
-Spyglass also engages on its own when you start Python implementation work, without you typing `/spyglass` — that is what it is for, and it is the point at which a design pass is worth anything. If you would rather it stayed out of the way for a particular task, just say so ("skip spyglass", "no design pass, just write it") and it will.
+The `plugin:skill` form is how Claude Code addresses a plugin's skills — the same shape as `/superpowers:brainstorming`. A bare `/spyglass` will not resolve.
+
+You will rarely need to type it. Spyglass engages on its own when you start Python implementation work — that is what it is for, and it is the point at which a design pass is worth anything. If you would rather it stayed out of the way for a particular task, just say so ("skip spyglass", "no design pass, just write it") and it will.
 
 Refactor assessment is **signal-driven by default** — Spyglass watches for four warning signs (complexity, near-duplicate code, plans that push existing files over a size limit, inconsistent conventions) and runs the assessment on its own when one fires. Neither `--refactor` nor `--no-refactor` is needed for normal use; they only override that judgment in either direction.
 
