@@ -346,9 +346,9 @@ def run_case(case: Case, dry: bool, model: str | None) -> bool:
         _, out_n = sh(base + ["--resume", session, turn], cwd=FIXTURE)
         more, s = harvest(out_n)
         session = s or session
-        transcript += "\n" + more
+        transcript = transcript + more
 
-    (REPO / "tests/.last-transcript.txt").write_text(transcript)
+    (REPO / "tests/.last-transcript.txt").write_text(transcript.full)
 
     results = [c(transcript, case) for c in case.checks]
     for r in results:

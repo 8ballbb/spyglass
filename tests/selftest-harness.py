@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+"""Self-test for the behavioural harness. Costs nothing; spawns nothing.
+
+A behavioural run takes minutes and real tokens, so a typo in the harness is an
+expensive way to learn something free could have told you. This exercises the
+plumbing and every grader against synthetic transcripts — including ones that
+should FAIL, because a check that cannot fail is not a check.
+
+    tests/selftest-harness.py
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import importlib.util
+
+spec = importlib.util.spec_from_file_location(
+    "harness", Path(__file__).resolve().parent / "run-behavioural.py")
+h = importlib.util.module_from_spec(spec)
+# Register before executing: @dataclass resolves its own module via
+# sys.modules, and blows up on a module that isn't there yet.
+sys.modules["harness"] = h
+spec.loader.exec_module(h)
+
+
+def stream(*blocks: dict) -> str:
+    """Build a stream-json payload the way the CLI emits one."""
+    lines = []
+    for b in blocks:
+        lines.append(json.dumps({
+            "session_id": "sess-123",
+            "message": {"content": [b]},
+        }))
+    return "\n".join(lines)
+
+
+def text(s: str) -> dict:
+    return {"type": "text", "text": s}
+
+
+def tool(name: str, **inp) -> dict:
+    return {"type": "tool_use", "name": name, "input": inp}
+
+
+failures: list[str] = []
+
+
+def expect(label: str, got, want) -> None:
+    if got == want:
+        print(f"  ok    {label}")
+    else:
+        print(f"  FAIL  {label}: got {got!r}, wanted {want!r}")
+        failures.append(label)
+
+
+print("harvest — splits what the user saw from everything emitted")
+t, session = h.harvest(stream(
+    text("Hello, does that name work?"),
+    tool("Write", file_path="pseudocode.md", content="## Level 1 — Module design"),
+))
+expect("session id recovered", session, "sess-123")
+expect("spoken text captured", "does that name work" in t.visible, True)
+expect("tool args excluded from visible", "Level 1" in t.visible, False)
+expect("tool args present in full", "Level 1" in t.full, True)
+
+print("\nTranscript accumulation across turns (the bug that cost a live run)")
+a, _ = h.harvest(stream(text("turn one")))
+b, _ = h.harvest(stream(text("turn two")))
+joined = a + b
+expect("visible concatenates", "turn one" in joined.visible and "turn two" in joined.visible, True)
+expect("full concatenates", "turn one" in joined.full and "turn two" in joined.full, True)
+
+print("\ncheck_no_jargon — grades only what the user saw")
+clean, _ = h.harvest(stream(
+    text("This looks small, so I'll keep the design pass light."),
+    tool("Write", file_path="p.md", content="## Level 2 — Contract design"),
+))
+expect("artefact headings are not a leak", h.check_no_jargon(clean, None).ok, True)
+
+leaky, _ = h.harvest(stream(text("HIL-1 — slug, prior context, Phase 4b next")))
+expect("real leak is caught", h.check_no_jargon(leaky, None).ok, False)
+
+print("\ncheck_investigation_ran — a promise is not a finding")
+promise, _ = h.harvest(stream(text("I'll check what already exists in a moment.")))
+expect("forward-looking promise fails", h.check_investigation_ran(promise, None).ok, False)
+
+ran, _ = h.harvest(stream(
+    tool("Task", subagent_type="spyglass:codebase-searcher"),
+    tool("Task", subagent_type="spyglass:stdlib-searcher"),
+    tool("Task", subagent_type="spyglass:deps-searcher"),
+))
+expect("all three searchers dispatched passes", h.check_investigation_ran(ran, None).ok, True)
+
+partial, _ = h.harvest(stream(tool("Task", subagent_type="spyglass:codebase-searcher")))
+expect("missing searchers fails", h.check_investigation_ran(partial, None).ok, False)
+
+print("\ncheck_dateutil_assessed — a reasoned verdict either way")
+rejected, _ = h.harvest(stream(text(
+    "python-dateutil is declared but not installed, and dateutil.parser.parse "
+    "is for ambiguous date strings — not applicable to epoch seconds.")))
+expect("reasoned rejection passes", h.check_dateutil_assessed(rejected, None).ok, True)
+
+endorsed, _ = h.harvest(stream(text(
+    "Use python-dateutil — it already handles every format in the contract.")))
+expect("reasoned endorsement passes", h.check_dateutil_assessed(endorsed, None).ok, True)
+
+vague, _ = h.harvest(stream(text(
+    "The project depends on python-dateutil. I'll factor that in when I check.")))
+expect("mention-without-verdict fails", h.check_dateutil_assessed(vague, None).ok, False)
+
+silent, _ = h.harvest(stream(text("Nothing relevant found.")))
+expect("never mentioned fails", h.check_dateutil_assessed(silent, None).ok, False)
+
+print("\ncheck_recommends_reuse — the outcome that matters most")
+reuse, _ = h.harvest(stream(text(
+    "normalise_date already covers this — extend it rather than writing a new one.")))
+expect("recommending reuse passes", h.check_recommends_reuse(reuse, None).ok, True)
+
+duplicate, _ = h.harvest(stream(text(
+    "There is a normalise_date in timeutils.py. I'll add a separate function.")))
+expect("found-but-duplicated fails", h.check_recommends_reuse(duplicate, None).ok, False)
+
+print("\ncheck_stopped_for_input")
+asked, _ = h.harvest(stream(text("Does that name work for you?")))
+expect("ends on a question passes", h.check_stopped_for_input(asked, None).ok, True)
+ploughed, _ = h.harvest(stream(text("Done. I have written the function.")))
+expect("no question fails", h.check_stopped_for_input(ploughed, None).ok, False)
+
+print()
+if failures:
+    print(f"{len(failures)} harness self-test(s) failed — fix before spending a run.")
+    sys.exit(1)
+print("Harness self-test passed. Safe to spend a real run.")
