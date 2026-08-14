@@ -44,6 +44,10 @@ Stop at 10. Report how many you read and how many you skipped.
 
 `inconsistent` is a finding, not a failure. It means new code cannot follow a convention that does not exist, and the caller needs to know before writing any.
 
+## Signal S4
+
+Any pattern you report as `inconsistent` raises **signal S4**. State plainly whether S4 fired and on which patterns, so the caller knows a refactor assessment is warranted and why.
+
 ## Discipline
 
 Report what is there, not what should be there. If the codebase uses a convention you consider poor, report it as `established` anyway — judging it is someone else's job.

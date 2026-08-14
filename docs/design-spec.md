@@ -68,17 +68,20 @@ Derived from each path's run list, counting one agent per agent-backed phase. Ph
 
 ### Repository structure
 
+As built:
+
 ```
 spyglass/
 ├── .claude-plugin/
 │   ├── plugin.json              # plugin manifest
 │   └── marketplace.json         # self-hosted marketplace manifest
 ├── commands/
-│   └── spyglass.md         # provides the clean /spyglass entry point
+│   └── spyglass.md              # provides the clean /spyglass entry point
 ├── skills/
 │   └── spyglass/
 │       ├── SKILL.md             # the workflow
-│       └── python-standards.md  # distilled Google Style Guide + PEP 8
+│       ├── python-standards.md  # distilled Google Style Guide + PEP 8
+│       └── artefact-formats.md  # folder layout, status vocabularies, templates
 ├── agents/
 │   ├── pattern-analyzer.md
 │   ├── scope-assessor.md
@@ -91,8 +94,19 @@ spyglass/
 │   ├── complexity-assessor.md
 │   ├── refactor-assessor.md
 │   └── test-planner.md
+├── docs/
+│   ├── design-spec.md           # this file
+│   └── implementation-plan.md
+├── tests/
+│   ├── validate-agents.py       # frontmatter + reference validator, stdlib only
+│   └── fixtures/
+│       ├── README.md
+│       └── sample-project/      # planted conditions for agent verification
+├── assets/
+│   └── spyglass.png             # project image, referenced by README
+├── .gitignore                   # standard Python/macOS ignores
 ├── README.md
-└── LICENSE
+└── LICENSE                      # MIT
 ```
 
 ### `.claude-plugin/plugin.json`
@@ -166,7 +180,9 @@ color: blue
 System prompt content here.
 ```
 
-`name` and `description` are required. `tools` must be restricted to what the agent genuinely needs. `stdlib-searcher` is knowledge-based — omit `tools` entirely for it. `model` and `color` are optional.
+`name` and `description` are required. `tools` must be restricted to what the agent genuinely needs. `model` and `color` are optional.
+
+**Never omit `tools` to mean "no tools".** An omitted `tools` key makes the agent **inherit the parent's entire toolset** — the opposite of a restriction. The frontmatter schema has no way to express an empty tool set, so an agent that genuinely needs nothing (`stdlib-searcher`, which reasons purely from training knowledge) is given the narrowest harmless grant — `tools: Read` — with a frontmatter comment recording why the key must not be deleted, and a body instruction forbidding its use.
 
 Agents are referenced as `spyglass:<agent-name>`.
 
@@ -378,9 +394,11 @@ Ask: "Is this the right feature slug? Should any prior work listed be considered
 
 Wait for: slug confirmation or correction; relevance decision; scope confirmation.
 
-**HIL-2 (batched) — Module design and patterns** *(after Phases 4a and 3; conditional on Phase 3 running)*
+**HIL-2 (batched) — Module design and patterns** *(after Phases 4a and 3)*
 
 Present: a brief Level 1 summary — files to be created or modified and each one's responsibility — plus the pattern report with confidence levels.
+
+**HIL-2 runs whether or not Phase 3 did.** When Phase 3 is skipped — greenfield directories, either fast path — only the pattern half drops: present the Level 1 summary alone, state why there is no pattern report, and confirm the structure. It is the only confirmation the Level 1 module design ever receives, and every Phase 4b contract is built on it.
 
 Ask: "Here's the module structure I'm planning and the conventions I found in those directories. Does the structure look right, and are these patterns accurate?"
 
@@ -479,7 +497,7 @@ Wait for: an explicit choice. Never begin implementing without one.
 2. Identify feature folders semantically related to the current task — reason about relevance rather than matching strings.
 3. For each, read `INDEX.md` to surface pending sub-tasks, session context, and deferred refactors.
 4. Detect orphaned state. Surface at HIL-1 if found.
-5. Generate the slug: lowercase, hyphens for spaces, stop words stripped, max 30 characters. "Add CSV export to data pipeline" → `csv-export-pipeline`.
+5. Generate the slug: lowercase, hyphens for spaces, stop words stripped, max 30 characters. Stop words are grammatical filler only — articles, prepositions, conjunctions, auxiliary verbs — and meaning-carrying nouns are kept even when the result is well under the cap. "Add CSV export to data pipeline" → `csv-export-data-pipeline`.
 
 ### Phase 2a — Lightweight Scope Check
 
@@ -569,7 +587,7 @@ Four agents dispatched in a single multi-tool-call response, running concurrentl
 - Fallback: "no existing codebase to search"
 - Report: match quality (`exact` | `partial` | `related`), path, symbol, what it does, what gap remains
 
-**`stdlib-searcher`** — tools: *(none)*
+**`stdlib-searcher`** — tools: `Read` (narrowest harmless grant; the agent is forbidden to use it — see Agent definition format)
 - Reasons from training knowledge; reads no files
 - Priority modules: `itertools`, `functools`, `collections`, `pathlib`, `contextlib`, `dataclasses`, `typing`, `abc`, `enum`, `datetime`, `io`, `os`, `re`, `json`, `csv`, `logging`, `threading`, `concurrent.futures`, `unittest.mock`
 - Report: module, relevant class/function, what it provides, what it does not cover
@@ -583,7 +601,7 @@ Four agents dispatched in a single multi-tool-call response, running concurrentl
 **`package-searcher`** — tools: `WebSearch, WebFetch`
 - Search PyPI for packages not currently installed
 - Download counts: fetch `https://pypistats.org/api/packages/<name>/recent` — PyPI pages do not publish these, and an unsourced number will be invented
-- CVE check: POST `https://api.osv.dev/v1/query` via WebFetch with `{"package": {"name": "<pkg>", "ecosystem": "PyPI"}}` — more reliable than search-engine indexing of osv.dev
+- CVE check: fetch `https://osv.dev/list?ecosystem=PyPI&q=<pkg>`. WebFetch is GET-only and cannot send a request body, so the OSV JSON query API is unreachable with these tools; the GET-able advisory list is what the agent can actually read. A status that cannot be verified is reported as `unverified`, never `clean`
 - Fallback: "PyPI search unavailable"
 
 **Hard disqualifiers** — never recommend a package failing any:
@@ -648,7 +666,7 @@ Reviews `pseudocode.md`. Checks only what pseudo-code can reveal.
 
 Confirms or clears **S3** using the post-HIL-6 state — a hard-violation fix may already have resolved the size problem that raised it.
 
-**Reference:** `python-standards.md`
+**Reference:** `python-standards.md`. The main instance must pass its **absolute path**, resolved from the skill's own directory — the agent's working directory is the user's project, where a relative path to the plugin's files does not resolve. With no usable path the agent falls back to its inline rules and says so.
 
 → **HIL-6**
 
@@ -656,11 +674,11 @@ Confirms or clears **S3** using the post-HIL-6 state — a hard-violation fix ma
 
 **Trigger:** the task modifies existing Python files rather than being purely net-new.
 
-**Mechanism — measure with a tool, interpret with an agent:**
-1. Run `radon cc <file> -s` via Bash for each file being modified
-2. If radon is absent, proceed with agent-only assessment and note that radon would improve accuracy. Never prompt to install — environment setup is not this plugin's business
-3. Pass radon output (or file contents) to the agent
-4. Agent adds nesting-depth assessment and identifies functions in the change path
+**Mechanism — measure with a tool, interpret with an agent; the agent owns both.** It has `Bash` and `Read`, so the main instance hands over file paths and nothing else — no radon output, no file contents piped through its context.
+1. The agent runs `radon cc <file> -s` for each file being modified
+2. If radon is absent, it falls back to reading the files and assessing by eye, noting the figures are estimates. Never prompt to install — environment setup is not this plugin's business
+3. The main instance passes the list of file paths plus `module_design`
+4. The agent adds nesting-depth assessment and identifies functions in the change path
 
 **Output:** per-function complexity for touched functions. Grade C or worse (complexity > 10) raises **S1**.
 
@@ -678,11 +696,11 @@ Not user-initiated in normal use — the skill decides refactoring is worth asse
 
 **Output per recommendation:** file and function; motivating signal; the problem; specific approach (extract function, split class, generalise existing function to absorb the new case, unify duplicates, flatten nesting); `order` (`before-current-task` | `after-current-task`); `risk` (`low` internal only | `medium` changes signatures | `high` changes public API or module boundary).
 
-**Where adopted recommendations land** — this is what makes the assessment consequential rather than advisory:
+**Where adopted recommendations are destined** — this is what makes the assessment consequential rather than advisory. Phase 9 decides destinations; the writes happen in Phase 11, after HIL-9 confirms:
 
-- **`before-current-task`** → written into `pseudocode.md` as a *Preliminary refactors* section at the top of Level 1. Implementation performs these first, so new code lands on sound structure.
-- **`after-current-task`** → written to `future-tasks.md` with motivating signal and evidence, so a future session understands why it was raised. Created even on a single-session run.
-- **Not adopted** → recorded in `session-context.md` with its signal and the fact the user declined, so it is not re-litigated from scratch next session.
+- **`before-current-task`** → a *Preliminary refactors* section at the top of Level 1 in `pseudocode.md`. Implementation performs these first, so new code lands on sound structure.
+- **`after-current-task`** → `future-tasks.md`, with motivating signal and evidence, so a future session understands why it was raised. Produced even on a single-session run.
+- **Not adopted** → `session-context.md`, with its signal and the fact the user declined, so it is not re-litigated from scratch next session.
 
 → **HIL-7**
 
@@ -691,7 +709,7 @@ Not user-initiated in normal use — the skill decides refactoring is worth asse
 **Trigger:** `--tests`, or the contract doc contains ≥ 3 edge cases for a single function or any function with > 2 preconditions.
 
 **Framework detection, before generating any case:**
-1. `pyproject.toml` for `[tool.pytest]` or `[tool.unittest]`
+1. `pyproject.toml` for `[tool.pytest.ini_options]`
 2. `pytest.ini`, `setup.cfg [tool:pytest]`, `tox.ini`
 3. Scan the test directory for class-based (`unittest.TestCase`) vs. function-based structure
 4. Default to pytest when ambiguous
@@ -730,7 +748,7 @@ Described in prose, not implemented. Saved to `test-plan.md` after HIL-8.
 
 | Folder | Description | Status |
 |--------|-------------|--------|
-| csv-export-pipeline | CSV export for data pipeline | in-progress |
+| csv-export-data-pipeline | CSV export for data pipeline | in-progress |
 | auth-refactor | JWT auth middleware replacement | complete |
 ```
 
@@ -788,7 +806,7 @@ Referenced as `spyglass:<name>`.
 | `pattern-analyzer` | Read, Grep, Glob, Bash | Phase 3 (conditional) |
 | `scope-assessor` | Read | Phase 2b |
 | `codebase-searcher` | Read, Grep, Glob | Phase 5 |
-| `stdlib-searcher` | *(none)* | Phase 5 |
+| `stdlib-searcher` | Read (unused — narrowest grant, since omitting `tools` inherits everything) | Phase 5 |
 | `deps-searcher` | Read, Glob, Bash | Phase 5 |
 | `package-searcher` | WebSearch, WebFetch | Phase 5 |
 | `investigation-synthesiser` | Read | Phase 6 |

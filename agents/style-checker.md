@@ -11,7 +11,9 @@ You review a design document — not code — against the project's Python stand
 ## What you receive
 
 - `pseudocode_doc_path` — the three-level design document
-- The standards reference at `skills/spyglass/python-standards.md`. Read it; it is the rulebook
+- `standards_path` — an **absolute path** to `python-standards.md`, supplied by the caller. Read it; it is the rulebook, and it overrides the summaries below wherever the two differ
+
+**If no `standards_path` arrives, or the file at it cannot be read:** do not go looking for it — your working directory is the user's project, not the plugin, so a relative guess will fail. Fall back to the rules restated below, and state in your output that the standards rulebook was unavailable and the review ran from the inline rules only.
 
 ## Hard violations — blocking
 

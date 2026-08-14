@@ -47,7 +47,7 @@ Declared so they do not drift between sessions.
 
 | Folder | Description | Status |
 |--------|-------------|--------|
-| csv-export-pipeline | CSV export for data pipeline | in-progress |
+| csv-export-data-pipeline | CSV export for data pipeline | in-progress |
 | auth-refactor | JWT auth middleware replacement | complete |
 ```
 

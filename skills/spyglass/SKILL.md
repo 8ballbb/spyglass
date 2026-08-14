@@ -22,9 +22,9 @@ Structured design analysis before any Python implementation. It prevents reimple
 3. Not found → artefact directory is `~/.claude/spyglass/`. State this plainly to the user.
 4. If the directory does not exist, create it and write `.gitignore` containing a single line: `*`.
 
-A `.gitignore` whose pattern matches everything, including itself, makes the whole tree invisible to git with **zero modification of any file the user owns**. On the run that creates it, announce once, verbatim:
+A `.gitignore` whose pattern matches everything, including itself, makes the whole tree invisible to git with **zero modification of any file the user owns**. On the run that creates it, announce once, verbatim except for `<artefact-dir>`, which is substituted with the location actually resolved above — `.claude/spyglass/` in a project, `~/.claude/spyglass/` under the no-project fallback:
 
-> Created `.claude/spyglass/` for design artefacts. It's self-ignored from git — your `.gitignore` was not modified.
+> Created `<artefact-dir>` for design artefacts. It's self-ignored from git — your `.gitignore` was not modified.
 
 **Hard rules:**
 
@@ -38,18 +38,18 @@ Evaluated **before Phase 1**, from the task description alone. Two variants, dis
 
 **`fast-path-modify`** — changes existing behaviour, introduces no new capability (add a parameter, fix an off-by-one, rename a symbol, adjust a threshold).
 - Criteria: under 15 words AND names an existing function, class, or file AND introduces no new capability
-- Skips: Phases 3, 5, 6, 10 and their HIL checkpoints
+- Skips: Phases 3, 5, 6, 10 and their HIL checkpoints — but **HIL-2 still runs**, on the Level 1 summary alone
 - Runs: 1, 2a, 4a, 4b, 2b, 7, 8, 9 (if signals fire), 11, 12
 - Rationale: nothing new is being built, so there is nothing to investigate — but the code being touched may still warrant refactoring, so Phases 8 and 9 stay live
 
 **`fast-path-add`** — adds a small new capability (one function, one small class).
 - Criteria: under 15 words AND describes a single new function or small class
-- Skips: Phases 3, 8, 10 and their HIL checkpoints
+- Skips: Phases 3, 8, 10 and their HIL checkpoints — but **HIL-2 still runs**, on the Level 1 summary alone
 - Runs: 1, 2a, 4a, 4b, 2b, **reduced Phase 5**, 6, 7, 9 (if signals fire), 11, 12
 - **Reduced Phase 5 dispatches only `spyglass:codebase-searcher` and `spyglass:stdlib-searcher`.** `spyglass:deps-searcher` and `spyglass:package-searcher` are skipped: adding a dependency for a trivial function is almost never right
 - Rationale: "write a function that slugifies a string" is short *and* is exactly where reimplementation happens
 
-**Announce which variant applies and why.** If neither matches, run the standard flow. When Phase 3 is skipped, Phases 4a and 4b run back to back as one planning step.
+**Announce which variant applies and why.** If neither matches, run the standard flow. When Phase 3 is skipped, Phase 4b follows Phase 4a directly as one planning step — with HIL-2 still between them, confirming the Level 1 summary without a pattern report.
 
 ## Phase Flow
 
@@ -59,7 +59,7 @@ Phase 2a — Lightweight scope check [Required]    Obvious signal from task desc
            └─ HIL-1 (batched): slug + prior context + scope signal
 Phase 4a — Module design (L1)      [Required]    Files, responsibilities, call graph
 Phase 3  — Pattern analysis        [Conditional] Targets directories named in L1
-           └─ HIL-2: confirm L1 summary + patterns
+           └─ HIL-2 [Required]: confirm L1 summary + patterns (L1 alone if Phase 3 skipped)
 Phase 4b — Contract + signature    [Required]    Levels 2-3, constrained by patterns
            └─ HIL-3: approve full plan → saved to pseudocode.md
 Phase 2b — Scope re-check          [Required]    Judge scope against the actual plan
@@ -91,7 +91,7 @@ Phase 12 — Handoff                 [Required]    Present artefacts, choose nex
 
 ### Phase 1 — Context Check — Required
 
-No agent; main instance. Resolve the artefact directory (above), then: (1) read `PLANS_INDEX.md` if present, noting its absence otherwise; (2) identify feature folders semantically related to the current task — reason about relevance rather than matching strings; (3) for each, read `INDEX.md` to surface pending sub-tasks, session context, and deferred refactors; (4) detect orphaned state (see Orphaned State Recovery), surfacing it at HIL-1 if found; (5) generate the slug — lowercase, hyphens for spaces, stop words stripped, max 30 characters ("Add CSV export to data pipeline" → `csv-export-pipeline`).
+No agent; main instance. Resolve the artefact directory (above), then: (1) read `PLANS_INDEX.md` if present, noting its absence otherwise; (2) identify feature folders semantically related to the current task — reason about relevance rather than matching strings; (3) for each, read `INDEX.md` to surface pending sub-tasks, session context, and deferred refactors; (4) detect orphaned state (see Orphaned State Recovery), surfacing it at HIL-1 if found; (5) generate the slug — lowercase, hyphens for spaces, stop words stripped, max 30 characters. Stop words are the grammatical filler only — articles, prepositions, conjunctions, and auxiliary verbs (`a`, `the`, `to`, `for`, `of`, `in`, `and`, `add`). Nouns that carry meaning are kept, even when the result is well under the cap: "Add CSV export to data pipeline" → `csv-export-data-pipeline`.
 
 → batched into **HIL-1**
 
@@ -156,7 +156,9 @@ Plus class skeletons with `__init__`, public methods, and `@property` definition
 
 ### Phase 5 — Library Investigation — Required
 
-**Dispatch all four agents in a single response** so they run concurrently. Phase 6 blocks until all have returned. Each reports "no findings" on failure rather than erroring. Under `fast-path-add`, only the first two run. Each agent receives the approved plan (Levels 1–3) and the functionality to be built.
+**Dispatch all four agents in a single response** so they run concurrently. Phase 6 blocks until all have returned. Each reports "no findings" on failure rather than erroring. Under `fast-path-add`, only the first two run.
+
+**Receives (every agent):** `task_description` and the approved plan — **all three levels** of `pseudocode.md`. Level 1 alone is not enough: Levels 2 and 3 hold the contracts and signatures a searcher needs to judge whether a candidate actually fits, rather than merely sounding related.
 
 - **`spyglass:codebase-searcher`** — searches project files for functions, classes, or utilities matching or approximating the planned functionality, by concept rather than identifier. Also receives Phase 3's file list and pattern report when available. Reports match quality (`exact` | `partial` | `related`), path, symbol, what it does, what gap remains.
 - **`spyglass:stdlib-searcher`** — reasons from training knowledge, reads no files. Reports module, relevant class/function, what it provides, what it does not cover.
@@ -185,7 +187,7 @@ A `partial-use` must specify: which source at which priority and for what; what 
 
 ### Phase 7 — Style & Principles Review — Required — `spyglass:style-checker`
 
-**Receives:** `pseudocode.md`. Reference standards: `python-standards.md` (sibling of this file). Checks only what pseudo-code can reveal.
+**Receives:** `pseudocode_doc_path`, and `standards_path` — the **absolute path** to `python-standards.md`, resolved from this skill's own directory (it is a sibling of this file). Resolve and pass it explicitly: the agent runs with the *user's project* as its working directory, where a relative path to the plugin's own files does not exist, so without an absolute path the rulebook is simply unreadable. Checks only what pseudo-code can reveal.
 
 **Hard violations — blocking:** function estimated at > 40 lines of logic; class estimated at > 200 lines total; `staticmethod` where a module-level function would serve; mutable default arguments in Level 3 signatures.
 
@@ -201,7 +203,9 @@ Confirms or clears **S3** using the post-HIL-6 state — a hard-violation fix ma
 
 **Trigger:** the task modifies existing Python files rather than being purely net-new.
 
-**Measure with a tool, interpret with an agent:** (1) run `radon cc <file> -s` via Bash for each file being modified; (2) if radon is absent, proceed with agent-only assessment and note that radon would improve accuracy — **never prompt to install**, environment setup is not this plugin's business; (3) pass radon output (or file contents) to the agent; (4) the agent adds nesting-depth assessment and identifies functions in the change path.
+**Receives:** the list of existing Python file **paths** the task will modify, and `module_design` so the agent knows which functions sit in the change path. Pass paths, not file contents — the agent has `Read` and fetches what it needs itself.
+
+**Measure with a tool, interpret with an agent — the agent owns both.** It has `Bash`: it runs `radon cc <file> -s` for each file itself. The main instance does not run radon and does not pipe radon output or file contents through its own context. If radon is absent, the agent falls back to reading the files and assessing by eye, noting that the figures are estimates and that radon would improve accuracy — **never prompt to install**, environment setup is not this plugin's business. The agent then adds what radon does not measure: nesting depth, and which functions the change actually touches.
 
 **Output:** per-function complexity for touched functions. Grade C or worse (complexity > 10) raises **S1**.
 
@@ -215,10 +219,10 @@ No HIL of its own. If S1 fires, the report is evidence at HIL-7. If nothing fire
 
 **Output per recommendation:** file and function; motivating signal; the problem; specific approach (extract function, split class, generalise existing function to absorb the new case, unify duplicates, flatten nesting); `order` (`before-current-task` | `after-current-task`); `risk` (`low` internal only | `medium` changes signatures | `high` changes public API or module boundary).
 
-**Where adopted recommendations land:**
-- **`before-current-task`** → written into `pseudocode.md` as a *Preliminary refactors* section at the top of Level 1, so implementation performs these first and new code lands on sound structure
-- **`after-current-task`** → written to `future-tasks.md` with motivating signal and evidence. Created even on a single-session run
-- **Not adopted** → recorded in `session-context.md` with its signal and the fact the user declined, so it is not re-litigated next session
+**Where adopted recommendations are destined** — this phase decides destinations, it does not write. Every file below is written in Phase 11, after HIL-9 confirms:
+- **`before-current-task`** → destined for a *Preliminary refactors* section at the top of Level 1 in `pseudocode.md`, so implementation performs these first and new code lands on sound structure
+- **`after-current-task`** → destined for `future-tasks.md`, with motivating signal and evidence. That file is produced even on a single-session run
+- **Not adopted** → recorded for `session-context.md` with its signal and the fact the user declined, so it is not re-litigated next session
 
 → **HIL-7**
 
@@ -226,7 +230,7 @@ No HIL of its own. If S1 fires, the report is evidence at HIL-7. If nothing fire
 
 **Trigger:** `--tests`, or the contract doc contains ≥ 3 edge cases for a single function, or any function with > 2 preconditions.
 
-**Framework detection, before generating any case:** `pyproject.toml` for `[tool.pytest]` or `[tool.unittest]` → `pytest.ini`, `setup.cfg [tool:pytest]`, `tox.ini` → scan the test directory for class-based (`unittest.TestCase`) vs. function-based structure → default to pytest when ambiguous.
+**Framework detection, before generating any case:** `pyproject.toml` for `[tool.pytest.ini_options]` → `pytest.ini`, `setup.cfg [tool:pytest]`, `tox.ini` → scan the test directory for class-based (`unittest.TestCase`) vs. function-based structure → default to pytest when ambiguous.
 
 **Output per public function, in the detected framework's conventions:** happy-path cases; edge cases from contract preconditions; error conditions with the expected exception; naming `test_<function>_<scenario>` (pytest) or the same as a method on a `TestCase` subclass (unittest). Described in prose, not implemented. Saved to `test-plan.md` **after** HIL-8.
 
@@ -235,6 +239,8 @@ No HIL of its own. If S1 fires, the report is evidence at HIL-7. If nothing fire
 ### Phase 11 — Artefact Update — Required
 
 No agent; main instance. Content is confirmed at HIL-9 **before any write**. Read `artefact-formats.md` before writing anything — it carries the status vocabularies, templates, and file contents.
+
+**Phase 11 owns every write in the run**, except three that are explicitly gated at their own checkpoints: `pseudocode.md` on HIL-3 approval, `pseudocode.md` again after HIL-6 resolves style violations, and `test-plan.md` after HIL-8. Everything else — `PLANS_INDEX.md`, `INDEX.md`, `session-context.md`, `future-tasks.md`, and the *Preliminary refactors* section adopted at HIL-7 — is written here and nowhere earlier. Earlier phases name destinations; this phase performs the writes.
 
 → **HIL-9**
 
@@ -275,13 +281,15 @@ Each fired signal is reported at HIL-7 with its evidence, so the user sees *why*
 
 **Wait for:** slug confirmation or correction; relevance decision; scope confirmation.
 
-### HIL-2 (batched) — Module design and patterns *(after Phases 4a and 3; conditional on Phase 3 running)*
+### HIL-2 (batched) — Module design and patterns *(after Phases 4a and 3)*
 
 **Present:** a brief Level 1 summary — files to be created or modified and each one's responsibility — plus the pattern report with confidence levels.
 
 **Ask:** "Here's the module structure I'm planning and the conventions I found in those directories. Does the structure look right, and are these patterns accurate?"
 
 **Wait for:** confirmation or correction of both. Module-design corrections send Phase 4a back for revision before Phase 4b. Pattern corrections are authoritative and become hard constraints on Phase 4b.
+
+**When Phase 3 did not run** — a greenfield directory with no Python files, or either fast path — **HIL-2 still happens.** Only the pattern half drops. Present the Level 1 summary alone, say plainly why there is no pattern report ("no existing Python in the target directories" or "fast path"), and ask only: "Does the module structure look right?" This checkpoint is the sole confirmation the Level 1 module design ever gets, and Level 1 is what Phase 4b builds every contract on — skipping it would send an unconfirmed structure all the way to HIL-3.
 
 ### HIL-3 — Full plan approval *(after Phase 4b)*
 
