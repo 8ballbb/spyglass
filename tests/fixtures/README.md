@@ -84,3 +84,19 @@ unblock it is not a harness.
 
 Each run spawns real agents and costs real tokens. Nothing runs without being
 asked for.
+
+### Cases
+
+| Case | Proves |
+|---|---|
+| `stops` | A bare request stops at the first checkpoint, in plain language, without writing code |
+| `reuse` | The reuse phase actually runs, finds the planted duplicate, and gives the declared dependency a reasoned verdict |
+| `dont-write-it` | When existing code already does the job, it recommends using it instead of designing a duplicate |
+
+`dont-write-it` is the most valuable of the three: recommending a new function
+where `normalise_date` already exists is the reimplementation failure this plugin
+exists to prevent, so it is the one case whose failure would mean the whole thing
+is pointless.
+
+Run `tests/selftest-harness.py` first — it costs nothing and catches harness bugs
+that would otherwise be discovered minutes and several agents into a live run.
