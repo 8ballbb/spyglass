@@ -85,6 +85,8 @@ Evaluated **before Phase 1**, from the task description alone. Two variants, dis
 
 That leaves: the opening checkpoint (name, prior work, size), then one combined plan checkpoint. Everything else runs without interruption.
 
+**HIL-1b still applies on both fast paths.** It is conditional on genuine ambiguity, not on flow length — and a fifteen-word request is where ambiguity is most likely, not least.
+
 **`fast-path-modify`** — changes existing behaviour, introduces no new capability (add a parameter, fix an off-by-one, rename a symbol, adjust a threshold).
 - Criteria: under 15 words AND names an existing function, class, or file AND introduces no new capability
 - Skips: Phases 2b, 3, 5, 6, 10 and HIL-2, HIL-4
@@ -110,6 +112,7 @@ If neither matches, run the standard flow.
 Phase 1  — Context check           [Required]    Locate artefact dir, read index, detect orphans, generate slug
 Phase 2a — Lightweight scope check [Required]    Obvious signal from task description
            └─ HIL-1 (batched): slug + prior context + scope signal
+           └─ HIL-1b [Conditional]: clarify an ambiguous request before designing
 Phase 4a — Module design (L1)      [Required]    Files, responsibilities, call graph
 Phase 3  — Pattern analysis        [Conditional] Targets directories named in L1
            └─ HIL-2 [Required]: confirm L1 summary + patterns (L1 alone if Phase 3 skipped)
@@ -345,6 +348,36 @@ This is the first thing the user ever sees. Follow **Speaking to the User** exac
 **Wait for:** a name confirmation or correction; a decision on prior work; a size confirmation.
 
 **Do not** print the internal slug format, the resolution rule, the phase list, or which fast-path variant fired. Do not quote their request back.
+
+### HIL-1b — Requirement clarification *(conditional — after HIL-1, before Phase 4a)*
+
+Every other checkpoint confirms something **Spyglass** produced. This one is different: it asks what the **user** actually meant. It exists because designing the wrong thing correctly is the most expensive failure available here — every phase after it compounds the error, and no amount of style checking or reuse investigation rescues a design that answers the wrong question.
+
+**Trigger — all three must hold:**
+
+1. The request is genuinely open to more than one reading, and
+2. The readings would produce **materially different designs** — different inputs, different behaviour, or "extend what exists" versus "write something new", and
+3. You can ground the alternatives in something concrete you have already seen in this codebase.
+
+**Do not ask** when the request is merely underspecified in ways a sensible default settles, when the difference is cosmetic, or when you are simply seeking reassurance. An unnecessary question here costs more than it looks: it teaches the user that checkpoints are noise, and that is how the ones that matter get waved through.
+
+**Ask exactly one question.** This is not a requirements interview. If two things are unclear, ask about the one that changes the design most; the rest will surface at the plan.
+
+**Ground every option in what is actually there.** Vague options produce vague answers. If an existing function plausibly already does the job, **that must be one of the options**, stated plainly — the user may not need the new code at all, and finding that out for the cost of one question is the best outcome this skill can produce.
+
+**Example of the shape** — offered because the codebase was read, not invented:
+
+> There's already a `normalise_date` in `src/dataflow/timeutils.py` that converts loose date strings to ISO-8601. What should the new function take?
+>
+> - **Unix epoch strings** — e.g. `"1700000000"`; genuinely different from what `normalise_date` handles
+> - **The same loose date strings** — in which case this is probably extending `normalise_date` rather than writing anything new
+> - **Something else** — tell me the format
+
+**Wait for:** an answer. Do not proceed to module design on an assumption.
+
+**Do not ask here what the reuse investigation is about to answer.** If the ambiguity only becomes visible once `codebase-searcher` reports at Phase 5, that belongs at HIL-5 — do not re-open it here, and do not ask the same question twice in one run.
+
+**If the answer means the work is unnecessary** — the user confirms existing code already covers it — say so plainly and stop. Offer to extend the existing function instead. Do not design a duplicate because a design was requested.
 
 ### HIL-2 (batched) — Module design and patterns *(after Phases 4a and 3)*
 

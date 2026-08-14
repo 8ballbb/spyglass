@@ -22,6 +22,8 @@ Spyglass runs structured design analysis before you write a line of Python, so t
 
 Spyglass produces a design and stops. It never implements on your behalf — implementation is always a separate, explicitly-chosen step at the end of the run.
 
+If your request is open to more than one reading in a way that would change the design, Spyglass asks — once, with concrete options drawn from what it found in your codebase. Where existing code plausibly already does the job, that is one of the options, because the most useful answer a design pass can give you is sometimes "you don't need to write this".
+
 ## Installation
 
 ```
@@ -51,7 +53,8 @@ Refactor assessment is **signal-driven by default** — Spyglass watches for fou
 
 ```
 Phase 1  — Context check                          Locate artefacts, detect orphaned state, generate slug
-Phase 2a — Lightweight scope check                 └─ HIL-1: slug + prior context + scope signal
+Phase 2a — Lightweight scope check                 └─ HIL-1: name + prior work + size
+                                                    └─ HIL-1b (conditional): clarify an ambiguous request
 Phase 4a — Module design (Level 1)
 Phase 3  — Pattern analysis (conditional)          └─ HIL-2: module structure + conventions found
 Phase 4b — Contract + signature design              └─ HIL-3: approve the full plan

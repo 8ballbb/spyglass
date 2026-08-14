@@ -382,6 +382,13 @@ Each fired signal is reported at HIL-7 with its evidence, so the user sees *why*
 
 ## HIL Checkpoint Specifications
 
+**Added after behavioural testing: HIL-1b, requirement clarification.**
+
+The original ten checkpoints all confirm something *Spyglass* produced — the name, the structure, the plan, the scope, the recommendation. None asked what the *user* meant. That was a gap, and the first real behavioural run exposed it: given "add a function that converts a timestamp string to ISO-8601" against a codebase already containing `normalise_date`, the skill spontaneously stopped and asked which format was wanted, offering "the same as `normalise_date`, in which case extend it rather than write anything new" as an option.
+
+That was the right instinct and it was undefined — so it would happen whenever the model noticed and silently not happen when it did not. HIL-1b makes it a defined, conditional checkpoint with a narrow trigger, a one-question limit, and a requirement that options be grounded in code actually read. Designing the wrong thing correctly is the most expensive failure in this flow; every later phase compounds it.
+
+
 Each checkpoint presents a specific question and waits for user input. Checkpoints are not optional.
 
 **HIL-1 (batched) — Slug, prior context, scope signal** *(after Phases 1 and 2a)*
