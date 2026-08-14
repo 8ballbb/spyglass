@@ -83,9 +83,17 @@ def check_skill_loaded(t: "Transcript", _) -> Result:
 def check_no_jargon(t: "Transcript", _) -> Result:
     # Deliberately `visible`: internal headings inside a design artefact are not
     # a leak — no user reads a Write tool's arguments.
-    hits = [why for pat, why in JARGON if re.search(pat, t.visible)]
+    hits = []
+    for pat, why in JARGON:
+        m = re.search(pat, t.visible)
+        if m:
+            # Quote the offending text. A failure that only names the rule costs
+            # an investigation to reproduce; one that shows the sentence does not.
+            lo, hi = max(0, m.start() - 70), min(len(t.visible), m.end() + 70)
+            excerpt = " ".join(t.visible[lo:hi].split())
+            hits.append(f"{why} — …{excerpt}…")
     return Result("no internal vocabulary leaked", not hits,
-                  "leaked: " + ", ".join(hits) if hits else "")
+                  "\n        ".join(hits) if hits else "")
 
 
 def check_artefacts_in_fixture(_t: str, _) -> Result:
@@ -349,6 +357,7 @@ def run_case(case: Case, dry: bool, model: str | None) -> bool:
         transcript = transcript + more
 
     (REPO / "tests/.last-transcript.txt").write_text(transcript.full)
+    (REPO / "tests/.last-visible.txt").write_text(transcript.visible)
 
     results = [c(transcript, case) for c in case.checks]
     for r in results:
@@ -359,7 +368,8 @@ def run_case(case: Case, dry: bool, model: str | None) -> bool:
 
     passed = all(r.ok for r in results)
     print(f"\n  {'PASS' if passed else 'FAIL'}  ({sum(r.ok for r in results)}/{len(results)})")
-    print(f"  transcript: tests/.last-transcript.txt")
+    print("  transcript: tests/.last-transcript.txt (full), "
+          ".last-visible.txt (what the user saw)")
     return passed
 
 

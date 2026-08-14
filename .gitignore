@@ -14,3 +14,4 @@ build/
 .superpowers/
 .serena/
 tests/.last-transcript.txt
+tests/.last-visible.txt

@@ -196,7 +196,19 @@ Plus class skeletons with `__init__`, public methods, and `@property` definition
 
 **Existing-code impact check:** where the plan adds to an existing class or module, estimate resulting size. Exceeding 200 lines, or adding a second distinct responsibility, raises **signal S3**.
 
-**Save:** on HIL-3 approval, Levels 1–3 are written to `<artefact-dir>/<slug>/pseudocode.md`. This is the working document for the rest of the run.
+**Save:** on HIL-3 approval, write all three stages to `<artefact-dir>/<slug>/pseudocode.md`. This is the working document for the rest of the run.
+
+**Use these exact headings in the file. Do not write "Level 1", "Level 2", or "Level 3" anywhere in it:**
+
+```markdown
+# <slug>
+
+## Module design
+## Contracts
+## Signatures
+```
+
+"Level N" names the stage of *writing* the plan, not a section of it. A human opens this file — and the plan is often shown back at a checkpoint, so an internal heading inside it becomes an internal heading on the user's screen. Descriptive names cost nothing and read better to everyone.
 
 → **HIL-3**
 
