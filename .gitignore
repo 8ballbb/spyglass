@@ -7,3 +7,9 @@ venv/
 dist/
 build/
 .pytest_cache/
+
+# Local tooling scratch. Untracked already, but named explicitly so a
+# directory-source plugin install does not sweep them in, and so they can
+# never be committed by accident.
+.superpowers/
+.serena/
