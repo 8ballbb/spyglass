@@ -46,3 +46,17 @@ These conditions are the fixture's entire purpose. Refactoring
 `load_records`, unifying the docstring styles, deduplicating
 `normalise_date`, or changing `pyproject.toml`'s dependencies will cause the
 corresponding Spyglass agent tests to fail or produce false negatives.
+
+## Resetting between runs
+
+Run `tests/reset-fixture.sh` before every behavioural test.
+
+Spyglass writes design artefacts into the project it runs against, and a second
+run **resumes from them** rather than starting fresh — correct behaviour, and
+exactly wrong for testing. The script clears artefacts from all three locations
+a run can write to (the fixture, the repo root, and `~/.claude/spyglass` from a
+no-project run), restores the fixture sources in case a run edited them, and
+verifies all four planted conditions are still intact.
+
+It exits non-zero if a plant has gone missing, so a fixture that can no longer
+exercise every check fails loudly instead of passing a weakened test.
