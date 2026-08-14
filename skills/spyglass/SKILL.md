@@ -456,7 +456,7 @@ Note which option comes first. Doing nothing is the cheapest outcome available, 
 ### HIL-7 (batched) — Refactor findings and adoption *(after Phases 8 and 9; conditional on a signal firing)*
 
 **Present** in one message:
-- **Why this ran** — which signals fired, with evidence (e.g. "S1: `parse_records` is radon grade D"; "S2: `utils.normalise_date` covers 70% of the planned `to_iso_date`")
+- **Why this ran** — the reason, in the user's terms, with evidence. Name the finding, never the signal: "your change touches `parse_records`, which is already dense — radon grades it D"; "`utils.normalise_date` already covers about 70% of what this plan would build". Writing "S1:" or "S2:" here is exactly the leak that **Speaking to the User** forbids, and this is the checkpoint where it happens, because this is the only one whose whole subject is an internal signal.
 - The complexity report, when Phase 8 ran
 - Up to 5 recommendations, each with `order` and `risk`
 

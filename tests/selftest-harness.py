@@ -97,6 +97,14 @@ expect("artefact headings are not a leak", h.check_no_jargon(clean, None).ok, Tr
 leaky, _ = h.harvest(stream(text("HIL-1 — slug, prior context, Phase 4b next")))
 expect("real leak is caught", h.check_no_jargon(leaky, None).ok, False)
 
+# Caught live: the signal-id rule had a (?! ) lookahead, so an id followed by a
+# space — which is nearly all of them — was graded clean.
+signal, _ = h.harvest(stream(text("S1 fired — the function being touched is dense.")))
+expect("a leaked signal id is caught", h.check_no_jargon(signal, None).ok, False)
+
+bucket, _ = h.harvest(stream(text("Reads the manifest from an AWS S3 bucket.")))
+expect("an S3 bucket is not a signal id", h.check_no_jargon(bucket, None).ok, True)
+
 print("\ncheck_investigation_ran — a promise is not a finding")
 promise, _ = h.harvest(stream(text("I'll check what already exists in a moment.")))
 expect("forward-looking promise fails", h.check_investigation_ran(promise, None).ok, False)

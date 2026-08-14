@@ -45,7 +45,11 @@ JARGON = [
     (r"\bLevel [123]\b", "Level 1/2/3 plan stages"),
     (r"fast-path-(add|modify)", "fast-path variant names"),
     (r"\bslug\b", "the word 'slug'"),
-    (r"\bS[1-4]\b(?! )", "refactor signal ids"),
+    # Not `(?! )`: a signal id is almost always followed by a space, so that
+    # lookahead meant this rule could essentially never fire, and it did not —
+    # "S1 fired — the function being touched…" was graded clean. The thing
+    # actually worth excluding is an S3 bucket.
+    (r"(?<!AWS )\bS[1-4]\b(?! bucket)", "refactor signal ids"),
 ]
 
 
