@@ -13,3 +13,4 @@ build/
 # never be committed by accident.
 .superpowers/
 .serena/
+tests/.last-transcript.txt

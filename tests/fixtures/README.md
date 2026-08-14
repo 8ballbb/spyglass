@@ -60,3 +60,27 @@ verifies all four planted conditions are still intact.
 
 It exits non-zero if a plant has gone missing, so a fixture that can no longer
 exercise every check fails loudly instead of passing a weakened test.
+
+## Automated behavioural tests
+
+`tests/run-behavioural.py` drives the plugin headlessly against this fixture and
+grades both the transcript and the filesystem side effects.
+
+```
+tests/run-behavioural.py --list      # show cases, spend nothing
+tests/run-behavioural.py --dry-run   # show the commands, spend nothing
+tests/run-behavioural.py             # run the default case
+tests/run-behavioural.py --case all  # run everything
+```
+
+Every assertion is deterministic — string and filesystem checks, no LLM judge. A
+grader that needs a model to decide whether it passed is a grader that can
+disagree with itself between runs.
+
+Runs use `--permission-mode bypassPermissions` because this fixture is disposable
+test data, reset before every run. `acceptEdits` is not enough: the run stops to
+ask before creating its notes directory, and a harness that needs a human to
+unblock it is not a harness.
+
+Each run spawns real agents and costs real tokens. Nothing runs without being
+asked for.
