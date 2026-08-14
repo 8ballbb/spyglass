@@ -137,6 +137,81 @@ duplicate, _ = h.harvest(stream(text(
     "There is a normalise_date in timeutils.py. I'll add a separate function.")))
 expect("found-but-duplicated fails", h.check_recommends_reuse(duplicate, None).ok, False)
 
+print("\nagent_ran / agent_skipped — the light paths are defined by what they omit")
+dispatched, _ = h.harvest(stream(tool("Task", subagent_type="spyglass:complexity-assessor")))
+expect("agent_ran passes when dispatched",
+       h.agent_ran("complexity-assessor", "why")(dispatched, None).ok, True)
+expect("agent_skipped fails when dispatched",
+       h.agent_skipped("complexity-assessor", "why")(dispatched, None).ok, False)
+
+absent, _ = h.harvest(stream(text("Nothing new is being built here.")))
+expect("agent_ran fails when absent",
+       h.agent_ran("complexity-assessor", "why")(absent, None).ok, False)
+expect("agent_skipped passes when absent",
+       h.agent_skipped("codebase-searcher", "why")(absent, None).ok, True)
+
+print("\ncheck_complexity_reported — measured, not merely touched")
+measured, _ = h.harvest(stream(text(
+    "load_records has a cyclomatic complexity of 14 (grade C) across its branches.")))
+expect("a graded measurement passes", h.check_complexity_reported(measured, None).ok, True)
+
+touched, _ = h.harvest(stream(text(
+    "I'll add the strict parameter to load_records and thread it through.")))
+expect("touched-but-unmeasured fails", h.check_complexity_reported(touched, None).ok, False)
+
+elsewhere, _ = h.harvest(stream(text("Complexity looks fine across the module.")))
+expect("complexity talk without the function fails",
+       h.check_complexity_reported(elsewhere, None).ok, False)
+
+print("\ncheck_refactor_unasked — and it invalidates itself if the case cheats")
+raised, _ = h.harvest(stream(tool("Task", subagent_type="spyglass:refactor-assessor")))
+expect("unprompted assessment passes", h.check_refactor_unasked(raised, None).ok, True)
+
+quiet, _ = h.harvest(stream(text("Complexity is 14, but I'll leave it alone.")))
+expect("signal fired with no assessment fails", h.check_refactor_unasked(quiet, None).ok, False)
+
+cheat = h.Case(name="x", prompt="/spyglass:spyglass refactor load_records",
+               description="", turns=[])
+expect("a case that asks for a refactor voids the check",
+       h.check_refactor_unasked(raised, cheat).ok, False)
+
+print("\ncheck_docstring_inconsistency — report the clash, don't average it")
+clash, _ = h.harvest(stream(text(
+    "timeutils.py uses Google-style docstrings while report.py uses NumPy style.")))
+expect("naming both styles passes", h.check_docstring_inconsistency(clash, None).ok, True)
+
+flagged, _ = h.harvest(stream(text("Docstring format: inconsistent across the package.")))
+expect("naming it inconsistent passes", h.check_docstring_inconsistency(flagged, None).ok, True)
+
+averaged, _ = h.harvest(stream(text("The project uses Google-style docstrings.")))
+expect("a confident wrong pick fails", h.check_docstring_inconsistency(averaged, None).ok, False)
+
+print("\ncheck_clarified_before_designing — right question, right turn, real ground")
+opening, _ = h.harvest(stream(text("Shall I call this date-cleanup?")))
+follow, _ = h.harvest(stream(
+    text("There's already a normalise_date in timeutils. What should this take?")))
+expect("grounded question on the second turn passes",
+       h.check_clarified_before_designing(opening + follow, None).ok, True)
+
+ploughed_on, _ = h.harvest(stream(tool("Write", file_path="pseudocode.md", content="…")))
+expect("designing without asking fails",
+       h.check_clarified_before_designing(opening + ploughed_on, None).ok, False)
+
+invented, _ = h.harvest(stream(text("Should it use a DateCleaner class or a function?")))
+expect("ungrounded question fails",
+       h.check_clarified_before_designing(opening + invented, None).ok, False)
+
+expect("a single-turn run fails rather than passing vacuously",
+       h.check_clarified_before_designing(opening, None).ok, False)
+
+print("\ncheck_said_no_project — notes the user cannot find are notes they have lost")
+told, _ = h.harvest(stream(text(
+    "There's no Python project here, so I'll keep these notes in ~/.claude/spyglass.")))
+expect("saying where it went passes", h.check_said_no_project(told, None).ok, True)
+
+silent_fallback, _ = h.harvest(stream(text("Right, let's design that. First, a name?")))
+expect("silent fallback fails", h.check_said_no_project(silent_fallback, None).ok, False)
+
 print("\ncheck_stopped_for_input")
 asked, _ = h.harvest(stream(text("Does that name work for you?")))
 expect("ends on a question passes", h.check_stopped_for_input(asked, None).ok, True)

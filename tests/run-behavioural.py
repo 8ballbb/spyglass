@@ -26,6 +26,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -59,6 +60,10 @@ class Case:
     description: str
     turns: list[str] = field(default_factory=list)  # extra turns, via --resume
     checks: list = field(default_factory=list)
+    # Where to run. Default is the fixture; "nowhere" means a fresh temp dir with
+    # no Python marker and no .git, which is the only way to exercise the
+    # no-project fallback — anywhere inside this repo resolves to this repo.
+    where: str = "fixture"
 
 
 def sh(cmd: list[str], cwd: Path | None = None, timeout: int = 900) -> tuple[int, str]:
@@ -197,6 +202,129 @@ def check_dateutil_assessed(t: "Transcript", _) -> Result:
                   "" if reasoned else "mentioned, but only as something it would check later")
 
 
+def agent_ran(agent: str, why: str):
+    """Assert a phase agent was dispatched.
+
+    Dispatch is visible because the harvester records tool_use names and
+    arguments. Agent *reports* come back as tool results, which it does not
+    record — but an agent's own messages carry parent_tool_use_id and are kept in
+    `full`, so its findings are gradeable too.
+    """
+    def check(t: "Transcript", _) -> Result:
+        ok = agent in t.full
+        return Result(f"dispatched {agent}", ok, "" if ok else why)
+    check.__name__ = "check_ran_" + agent.replace("-", "_")
+    return check
+
+
+def agent_skipped(agent: str, why: str):
+    """Assert a phase agent was NOT dispatched.
+
+    The light paths are defined as much by what they skip as by what they run. A
+    fast path that quietly does everything anyway is not a fast path, and no
+    positive check would notice.
+    """
+    def check(t: "Transcript", _) -> Result:
+        ok = agent not in t.full
+        return Result(f"skipped {agent}", ok, "" if ok else why)
+    check.__name__ = "check_skipped_" + agent.replace("-", "_")
+    return check
+
+
+def check_complexity_reported(t: "Transcript", _) -> Result:
+    """The planted complexity (P2) must be measured and named.
+
+    radon is deliberately not a dependency of this plugin, so this also covers
+    the assessor's fallback path: it has to reach a usable answer without it.
+    """
+    if "load_records" not in t.full:
+        return Result("measured the complexity of load_records", False,
+                      "never looked at the function being modified")
+    graded = re.search(
+        r"load_records[\s\S]{0,250}\b(complexity|cyclomatic|grade [A-F]\b|branches)"
+        r"|\b(complexity|cyclomatic|grade [A-F])\b[\s\S]{0,250}load_records",
+        t.full, re.I)
+    return Result("measured the complexity of load_records", bool(graded),
+                  "" if graded else "touched it, but never assessed its complexity")
+
+
+def check_refactor_unasked(t: "Transcript", case) -> Result:
+    """Refactoring must be raised by the signal, not by the user.
+
+    The whole design of Phase 9 is that nobody has to remember to ask. If the
+    case prompt mentions refactoring, this check proves nothing — so it fails
+    itself rather than reporting a pass it did not earn.
+    """
+    said = [case.prompt, *case.turns] if case else []
+    if any("refactor" in s.lower() for s in said):
+        return Result("raised refactoring unprompted", False,
+                      "case prompt mentions refactoring — this check is void, rewrite the case")
+    ok = "refactor-assessor" in t.full
+    return Result("raised refactoring unprompted", ok,
+                  "" if ok else "a signal should have fired on this file, but nothing assessed it")
+
+
+def check_docstring_inconsistency(t: "Transcript", _) -> Result:
+    """The planted style clash (P3) must be reported, not averaged over.
+
+    timeutils.py is Google-style and report.py is NumPy-style. New code cannot
+    follow a convention that does not exist, so the honest answer is "these
+    disagree" — not a confident pick of whichever file was read first.
+    """
+    # Proximity, not sentence-bounding: the evidence here is filenames, and
+    # `[^.]` stops dead at the dot in "report.py".
+    both = re.search(r"google[\s\S]{0,200}numpy|numpy[\s\S]{0,200}google", t.full, re.I)
+    named = re.search(r"inconsistent[\s\S]{0,150}docstring|docstring[\s\S]{0,150}inconsistent",
+                      t.full, re.I)
+    ok = bool(both or named)
+    return Result("reported the clashing docstring styles", ok,
+                  "" if ok else "did not report that the two files disagree (P3 missed)")
+
+
+def check_clarified_before_designing(t: "Transcript", _) -> Result:
+    """An ambiguous request must be clarified at the second turn, and grounded.
+
+    Second turn specifically: the opening checkpoint already asks its own
+    questions, so a run-wide search for a question mark would pass on that alone.
+    Grounding means naming something really in the codebase — an invented
+    alternative is a worse question than none, because it reads as informed.
+    """
+    steps = t.steps
+    if len(steps) < 2:
+        return Result("asked a grounded clarifying question", False,
+                      "run had fewer than two turns")
+    step = steps[1]
+    real = [s for s in ("normalise_date", "timeutils", "load_records", "summarise",
+                        "ingest.py", "report.py") if s in step.full]
+    asked = "AskUserQuestion" in step.full or "?" in step.visible
+    if not asked:
+        return Result("asked a grounded clarifying question", False,
+                      "went straight to designing without resolving the ambiguity")
+    if not real:
+        return Result("asked a grounded clarifying question", False,
+                      "asked, but named nothing that actually exists in the project")
+    return Result("asked a grounded clarifying question", True,
+                  "grounded in " + ", ".join(real))
+
+
+def check_artefacts_in_home(_t, _) -> Result:
+    """No project, no marker — notes belong in the home fallback, not in cwd."""
+    home = Path.home() / ".claude/spyglass"
+    entries = [p.name for p in home.iterdir()
+               if p.is_dir()] if home.is_dir() else []
+    return Result("fell back to ~/.claude/spyglass", bool(entries),
+                  "wrote nothing there" if not entries else "created " + ", ".join(entries))
+
+
+def check_said_no_project(t: "Transcript", _) -> Result:
+    """And it has to say so. Notes the user cannot find are notes they have lost."""
+    said = re.search(r"no (python )?project|couldn't find a project|"
+                     r"outside (a|any) project|~/\.claude|home directory",
+                     t.visible, re.I)
+    return Result("said plainly where the notes went", bool(said),
+                  "" if said else "used the fallback silently — the user has no idea where they are")
+
+
 # ── cases ─────────────────────────────────────────────────────────────────────
 
 CASES = [
@@ -256,6 +384,89 @@ CASES = [
             check_no_implementation,
         ],
     ),
+    Case(
+        name="modify",
+        description="Changing existing code takes the light path — no reuse "
+                    "hunt — but still measures complexity and raises refactoring "
+                    "on its own.",
+        prompt="/spyglass:spyglass add a strict mode parameter to load_records",
+        turns=[
+            "Yes, that's the right function. Strict mode should raise on a bad "
+            "record instead of skipping it.",
+            "The plan looks right. Continue.",
+            "Continue.",
+        ],
+        checks=[
+            check_no_jargon,
+            # Nothing new is being built, so there is nothing to investigate.
+            # If the searchers run here, the light path is not light.
+            agent_skipped("codebase-searcher",
+                          "ran the reuse hunt on a change that adds no capability"),
+            agent_skipped("scope-assessor",
+                          "re-checked scope on a single-parameter change"),
+            agent_ran("complexity-assessor",
+                      "modified an existing function without measuring it"),
+            check_complexity_reported,
+            check_refactor_unasked,
+            check_gitignore_untouched,
+            check_no_implementation,
+        ],
+    ),
+    Case(
+        name="patterns",
+        description="A cross-cutting request takes the full path, and must "
+                    "report that the target directory's conventions disagree.",
+        prompt="/spyglass:spyglass add a validation layer to the ingest pipeline "
+               "that checks each record's fields before summarising, and include "
+               "the rejected records in the summary output",
+        turns=[
+            "Yes, that name works and there's no prior work on this.",
+            "The structure looks right, and yes those conventions match what I'd "
+            "expect. Continue.",
+            "The plan looks right. Go ahead.",
+            "Scope looks fine as one piece of work. Continue.",
+            "Continue.",
+        ],
+        checks=[
+            check_no_jargon,
+            agent_ran("pattern-analyzer",
+                      "wrote a multi-file plan without reading the local conventions"),
+            check_docstring_inconsistency,
+            # Only the full path proposes genuinely new dependencies.
+            agent_ran("package-searcher", "full path skipped the PyPI search"),
+            agent_ran("scope-assessor", "never judged whether this fits one session"),
+            check_gitignore_untouched,
+            check_no_implementation,
+        ],
+    ),
+    Case(
+        name="ambiguous",
+        description="A request open to more than one reading must be clarified "
+                    "before anything is designed.",
+        prompt="/spyglass:spyglass add a function to clean up dates",
+        turns=[
+            "Yes, that name is fine and there's no prior work on this.",
+        ],
+        checks=[
+            check_no_jargon,
+            check_clarified_before_designing,
+            check_gitignore_untouched,
+            check_no_implementation,
+        ],
+    ),
+    Case(
+        name="no-project",
+        description="Run where there is no Python project, notes go to the home "
+                    "fallback — and it says so.",
+        prompt="/spyglass:spyglass add a function that slugifies a string",
+        where="nowhere",
+        checks=[
+            check_no_jargon,
+            check_artefacts_in_home,
+            check_said_no_project,
+            check_stopped_for_input,
+        ],
+    ),
 ]
 
 
@@ -268,13 +479,25 @@ class Transcript:
     is wrong: a design artefact may legitimately use internal headings in its own
     body, and flagging that as a leak fails the run for something no user ever
     reads.
+
+    `turns` keeps each turn separately, because some behaviour is only wrong at a
+    particular moment. "Asked a grounded clarifying question" is true of the
+    second turn or it is not true at all; searching the whole run for a question
+    mark would pass on any checkpoint anywhere.
     """
     visible: str = ""
     full: str = ""
+    turns: list["Transcript"] = field(default_factory=list)
+
+    @property
+    def steps(self) -> list["Transcript"]:
+        """This run's turns — or itself, if it is a single turn."""
+        return self.turns or [self]
 
     def __add__(self, other: "Transcript") -> "Transcript":
         return Transcript(self.visible + "\n" + other.visible,
-                          self.full + "\n" + other.full)
+                          self.full + "\n" + other.full,
+                          self.steps + other.steps)
 
 
 def harvest(stream: str) -> tuple[Transcript, str | None]:
@@ -328,6 +551,19 @@ def reset() -> None:
     shutil.rmtree(REPO / ".claude", ignore_errors=True)
 
 
+def workdir(case: Case) -> tuple[Path, Path | None]:
+    """Where the case runs, plus a temp dir to clean up afterwards if any.
+
+    "nowhere" has to be outside this repo. Anywhere inside it walks up to a
+    pyproject.toml or a .git and finds a project, which is the opposite of what
+    the fallback case is testing.
+    """
+    if case.where == "fixture":
+        return FIXTURE, None
+    tmp = Path(tempfile.mkdtemp(prefix="spyglass-no-project-"))
+    return tmp, tmp
+
+
 def run_case(case: Case, dry: bool, model: str | None) -> bool:
     print(f"\n{'─' * 78}\n{case.name}  —  {case.description}\n{'─' * 78}")
 
@@ -343,32 +579,38 @@ def run_case(case: Case, dry: bool, model: str | None) -> bool:
         base += ["--model", model]
 
     if dry:
-        print(f"  would run in {FIXTURE}:")
+        print(f"  would run in {'a fresh temp dir' if case.where == 'nowhere' else FIXTURE}:")
         print("   ", " ".join(base + [repr(case.prompt)]))
         for turn in case.turns:
             print("    then --resume <id>", repr(turn))
         return True
 
     reset()
-    print("  running (this spawns real agents and takes a few minutes)…")
+    cwd, temp = workdir(case)
+    print(f"  running in {cwd} (this spawns real agents and takes a few minutes)…")
 
-    code, out = sh(base + [case.prompt], cwd=FIXTURE)
-    transcript, session = harvest(out)
+    try:
+        _, out = sh(base + [case.prompt], cwd=cwd)
+        transcript, session = harvest(out)
 
-    for i, turn in enumerate(case.turns, 1):
-        if not session:
-            print("  ! no session id returned; cannot continue the conversation")
-            return False
-        print(f"  answering checkpoint {i}/{len(case.turns)}…")
-        _, out_n = sh(base + ["--resume", session, turn], cwd=FIXTURE)
-        more, s = harvest(out_n)
-        session = s or session
-        transcript = transcript + more
+        for i, turn in enumerate(case.turns, 1):
+            if not session:
+                print("  ! no session id returned; cannot continue the conversation")
+                return False
+            print(f"  answering checkpoint {i}/{len(case.turns)}…")
+            _, out_n = sh(base + ["--resume", session, turn], cwd=cwd)
+            more, s = harvest(out_n)
+            session = s or session
+            transcript = transcript + more
 
-    (REPO / "tests/.last-transcript.txt").write_text(transcript.full)
-    (REPO / "tests/.last-visible.txt").write_text(transcript.visible)
+        (REPO / "tests/.last-transcript.txt").write_text(transcript.full)
+        (REPO / "tests/.last-visible.txt").write_text(transcript.visible)
 
-    results = [c(transcript, case) for c in case.checks]
+        results = [c(transcript, case) for c in case.checks]
+    finally:
+        if temp:
+            shutil.rmtree(temp, ignore_errors=True)
+
     for r in results:
         mark = "ok  " if r.ok else "FAIL"
         print(f"  {mark}  {r.name}")
@@ -395,8 +637,8 @@ def main() -> None:
 
     if args.list:
         for c in CASES:
-            print(f"  {c.name:<8} {c.description}")
-            print(f"           {len(c.checks)} checks"
+            print(f"  {c.name:<12} {c.description}")
+            print(f"  {'':<12} {len(c.checks)} checks"
                   f"{f', {len(c.turns) + 1} turns' if c.turns else ''}")
         return
 
