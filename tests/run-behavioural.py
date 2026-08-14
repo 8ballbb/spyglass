@@ -589,6 +589,20 @@ def harvest(stream: str) -> tuple[Transcript, str | None]:
     return Transcript("\n".join(spoken), "\n".join(parts)), session
 
 
+def sync_plugin() -> None:
+    """Push the working tree into the installed plugin before grading it.
+
+    `claude plugin install` snapshots; it does not track this repo. Without this,
+    a run grades whatever was last installed and reports it as the current
+    behaviour — the one failure this harness cannot detect from the transcript.
+    """
+    code, out = sh(["bash", str(REPO / "tests/sync-plugin.sh")])
+    if code != 0:
+        print(out)
+        sys.exit("could not sync the plugin — refusing to grade a stale install")
+    print("  " + out.strip().splitlines()[0])
+
+
 def reset() -> None:
     code, out = sh(["bash", str(RESET)])
     if code != 0:
@@ -631,6 +645,7 @@ def run_case(case: Case, dry: bool, model: str | None) -> bool:
             print("    then --resume <id>", repr(turn))
         return True
 
+    sync_plugin()
     reset()
     cwd, temp = workdir(case)
     print(f"  running in {cwd} (this spawns real agents and takes a few minutes)…")
