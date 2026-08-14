@@ -310,6 +310,31 @@ def check_clarified_before_designing(t: "Transcript", _) -> Result:
                   "grounded in " + ", ".join(real))
 
 
+def check_declined_unnecessary_work(t: "Transcript", _) -> Result:
+    """Asked for something that already exists, the answer is "it already does that".
+
+    This is the cheapest possible outcome and the hardest one for a model to
+    reach: the request is an instruction, the code is right there, and designing
+    it anyway looks like helpfulness. A design process that cannot say "no work
+    needed" will always find work.
+    """
+    declined = re.search(
+        r"already (has|takes|does|raises|implement|support)|"
+        r"nothing to (design|build|do)|nothing left to build|"
+        r"no new code|no code needs to change|already what it does",
+        t.visible, re.I)
+    return Result("said the work was unnecessary", bool(declined),
+                  "" if declined else "designed it anyway instead of saying it already exists")
+
+
+def check_no_plan_written(_t, _) -> Result:
+    """And it must not leave a plan behind for work it just said was unnecessary."""
+    plans = list((FIXTURE / ".claude/spyglass").rglob("pseudocode.md")) \
+        if (FIXTURE / ".claude/spyglass").is_dir() else []
+    return Result("wrote no plan for work it declined", not plans,
+                  "; ".join(str(p.relative_to(FIXTURE)) for p in plans))
+
+
 def check_offered_doing_nothing(t: "Transcript", _) -> Result:
     """"You may not need this" has to be on the menu.
 
@@ -434,10 +459,14 @@ CASES = [
         description="Changing existing code takes the light path — no reuse "
                     "hunt — but still measures complexity and raises refactoring "
                     "on its own.",
-        prompt="/spyglass:spyglass add a strict mode parameter to load_records",
+        # Must be a change the fixture does not already have. An earlier version
+        # of this case asked for a strict mode parameter, which load_records has
+        # had all along — the run correctly refused to design it, and the case
+        # proved nothing about the light path. That refusal is now its own case.
+        prompt="/spyglass:spyglass add an encoding parameter to load_records",
         turns=[
-            "Yes, that's the right function. Strict mode should raise on a bad "
-            "record instead of skipping it.",
+            "Yes, that's the right function. It should default to utf-8 and be "
+            "passed through to open().",
             "The plan looks right. Continue.",
             "Continue.",
         ],
@@ -454,6 +483,20 @@ CASES = [
             check_complexity_reported,
             check_refactor_unasked,
             check_gitignore_untouched,
+            check_no_implementation,
+        ],
+    ),
+    Case(
+        name="already-done",
+        description="Asked for something the code already does, it must say so "
+                    "and stop — not design it again.",
+        # load_records has taken a `strict` parameter from the start, and it
+        # already raises rather than skipping. There is nothing here to build.
+        prompt="/spyglass:spyglass add a strict mode parameter to load_records",
+        checks=[
+            check_no_jargon,
+            check_declined_unnecessary_work,
+            check_no_plan_written,
             check_no_implementation,
         ],
     ),

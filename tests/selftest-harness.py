@@ -204,6 +204,17 @@ expect("ungrounded question fails",
 expect("a single-turn run fails rather than passing vacuously",
        h.check_clarified_before_designing(opening, None).ok, False)
 
+print("\ncheck_declined_unnecessary_work — a process that can't say 'no work needed'")
+declined, _ = h.harvest(stream(text(
+    "load_records already takes a strict parameter and already raises. "
+    "Nothing to design here.")))
+expect("declining passes", h.check_declined_unnecessary_work(declined, None).ok, True)
+
+designed, _ = h.harvest(stream(text(
+    "Right — I'll add a strict parameter to load_records. First, a name for this?")))
+expect("designing it anyway fails",
+       h.check_declined_unnecessary_work(designed, None).ok, False)
+
 print("\ncheck_offered_doing_nothing — 'you may not need this' has to be on the menu")
 offered, _ = h.harvest(stream(text(
     "There's already a normalise_date. Options: extend it, add a batch wrapper, "
