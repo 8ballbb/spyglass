@@ -512,7 +512,13 @@ CASES = [
                "that checks each record's fields before summarising, and include "
                "the rejected records in the summary output",
         turns=[
-            "Yes, that name works and there's no prior work on this.",
+            # This must answer the clarifying question, not just the name. An
+            # earlier version answered only the name, and the run spent all five
+            # turns refusing to guess — correctly, and while proving nothing
+            # about the full path it was written to exercise.
+            "Yes, that name works and there's no prior work on this. To answer "
+            "your question: leave load_records exactly as it is — the new "
+            "validation step runs after it and validates its output.",
             "The structure looks right, and yes those conventions match what I'd "
             "expect. Continue.",
             "The plan looks right. Go ahead.",
@@ -528,6 +534,27 @@ CASES = [
             agent_ran("package-searcher", "full path skipped the PyPI search"),
             agent_ran("scope-assessor", "never judged whether this fits one session"),
             check_gitignore_untouched,
+            check_no_implementation,
+        ],
+    ),
+    Case(
+        name="holds-out",
+        description="Given non-answers to a question that decides the design, it "
+                    "must keep asking rather than guess.",
+        # Same request as `patterns`, which reliably raises a real ambiguity:
+        # does the new layer replace load_records' silent drop/default, or sit
+        # after it? Every reply below dodges it.
+        prompt="/spyglass:spyglass add a validation layer to the ingest pipeline "
+               "that checks each record's fields before summarising, and include "
+               "the rejected records in the summary output",
+        turns=[
+            "Yes, that name works and there's no prior work on this.",
+            "Continue.",
+        ],
+        checks=[
+            check_no_jargon,
+            check_no_plan_written,
+            check_stopped_for_input,
             check_no_implementation,
         ],
     ),
