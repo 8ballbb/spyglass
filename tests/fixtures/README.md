@@ -87,16 +87,45 @@ asked for.
 
 ### Cases
 
-| Case | Proves |
-|---|---|
-| `stops` | A bare request stops at the first checkpoint, in plain language, without writing code |
-| `reuse` | The reuse phase actually runs, finds the planted duplicate, and gives the declared dependency a reasoned verdict |
-| `dont-write-it` | When existing code already does the job, it recommends using it instead of designing a duplicate |
+| Case | Proves | Plant |
+|---|---|---|
+| `stops` | A bare request stops at the first checkpoint, in plain language, without writing code | — |
+| `reuse` | The reuse phase actually runs, finds the planted duplicate, and gives the declared dependency a reasoned verdict | P1, P4 |
+| `dont-write-it` | When existing code already does the job, it recommends using it instead of designing a duplicate | P1 |
+| `modify` | Changing existing code skips the reuse hunt, but still measures complexity and raises refactoring unprompted | P2 |
+| `already-done` | Asked for something the code already does, it says so and stops | P2 |
+| `patterns` | A cross-cutting request takes the full path and reports that the target directory's conventions disagree | P3 |
+| `holds-out` | Fed non-answers to a question that decides the design, it keeps asking rather than guessing | — |
+| `ambiguous` | An open-ended request is clarified before anything is designed, and "use what exists" is on the menu | P1 |
+| `no-project` | Outside a Python project, notes go to `~/.claude/spyglass` and it says so | — |
 
-`dont-write-it` is the most valuable of the three: recommending a new function
-where `normalise_date` already exists is the reimplementation failure this plugin
-exists to prevent, so it is the one case whose failure would mean the whole thing
-is pointless.
+Four of these — `dont-write-it`, `already-done`, `ambiguous`, `holds-out` — test
+the same thing from different angles: **not building something**. That is
+deliberate. Recommending a new function where `normalise_date` already exists is
+the reimplementation failure this plugin exists to prevent, and a design process
+that cannot say "no work needed" will always find work.
 
 Run `tests/selftest-harness.py` first — it costs nothing and catches harness bugs
 that would otherwise be discovered minutes and several agents into a live run.
+
+### Testing the thing you actually changed
+
+`tests/sync-plugin.sh` copies the working tree into the installed plugin cache,
+and every case runs it first.
+
+`claude plugin install` takes a snapshot; it does not track this repo. Without
+the sync, editing `SKILL.md` changes nothing about what a run exercises — the run
+still prints green, against the last published version. That is not
+hypothetical: four cases were graded against a cache with no HIL-1b in it,
+including the case written to test HIL-1b. It passed, because the base model
+asked a clarifying question on its own.
+
+`tests/sync-plugin.sh --check` reports drift without changing anything.
+
+### Runs that never happened
+
+A run that dies partway — session limit, rate limit, server error — looks
+identical to a plugin that did nothing: both are an absence of expected text. The
+harness detects those conditions first and aborts the case ungraded, because the
+alternative is a confident report of behavioural failures that were never
+observed.
