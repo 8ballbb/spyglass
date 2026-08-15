@@ -636,6 +636,32 @@ def harvest(stream: str) -> tuple[Transcript, str | None]:
     return Transcript("\n".join(spoken), "\n".join(parts)), session
 
 
+# Conditions that mean the run never really happened. Grading these produces
+# confident, entirely fictional findings: a session-limit stop was once reported
+# as four behavioural failures, including agents that were never given the
+# chance to be dispatched.
+ABORTED = [
+    (r"session limit", "the session limit was reached mid-run"),
+    (r"usage limit", "the usage limit was reached mid-run"),
+    (r"rate limit", "rate limited mid-run"),
+    (r"Credit balance is too low", "out of credit"),
+    (r"API Error: 5\d\d", "the API returned a server error"),
+]
+
+
+def aborted(t: "Transcript") -> str | None:
+    """Why this run cannot be graded, or None if it can.
+
+    A failed run and a failing plugin look identical to every check here — both
+    are just an absence of the expected text. The difference matters enormously,
+    so it is established before anything else gets an opinion.
+    """
+    for pat, why in ABORTED:
+        if re.search(pat, t.full, re.I):
+            return why
+    return None
+
+
 def sync_plugin() -> None:
     """Push the working tree into the installed plugin before grading it.
 
@@ -713,6 +739,12 @@ def run_case(case: Case, dry: bool, model: str | None) -> bool:
 
         (REPO / "tests/.last-transcript.txt").write_text(transcript.full)
         (REPO / "tests/.last-visible.txt").write_text(transcript.visible)
+
+        why = aborted(transcript)
+        if why:
+            print(f"\n  ABORTED — {why}.")
+            print("  Not graded: nothing here reflects the plugin's behaviour.")
+            return False
 
         results = [c(transcript, case) for c in case.checks]
     finally:

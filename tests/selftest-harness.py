@@ -266,6 +266,22 @@ expect("saying where it went passes", h.check_said_no_project(told, None).ok, Tr
 silent_fallback, _ = h.harvest(stream(text("Right, let's design that. First, a name?")))
 expect("silent fallback fails", h.check_said_no_project(silent_fallback, None).ok, False)
 
+print("\naborted — a run that never happened must not be graded")
+limited, _ = h.harvest(stream(
+    text("I'm using the spyglass skill to design this before writing code."),
+    text("You've hit your session limit · resets 12:40am (Europe/Dublin)")))
+expect("a session limit is detected", bool(h.aborted(limited)), True)
+# This is what made the guard necessary: every check reads the truncated run as
+# a behavioural failure, and they are all wrong in the same confident way.
+expect("and would otherwise be graded as a plugin bug",
+       h.agent_ran("pattern-analyzer", "why")(limited, None).ok, False)
+
+server_error, _ = h.harvest(stream(text("API Error: 529 overloaded")))
+expect("a server error is detected", bool(h.aborted(server_error)), True)
+
+fine, _ = h.harvest(stream(text("Here's the plan. Does the structure look right?")))
+expect("a real run is not mistaken for an abort", h.aborted(fine), None)
+
 print("\ncheck_stopped_for_input")
 asked, _ = h.harvest(stream(text("Does that name work for you?")))
 expect("ends on a question passes", h.check_stopped_for_input(asked, None).ok, True)
