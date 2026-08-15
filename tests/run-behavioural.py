@@ -491,6 +491,46 @@ CASES = [
         ],
     ),
     Case(
+        name="no-refactor",
+        description="The suppression keyword must beat a signal that really "
+                    "fired, not merely one that never would have.",
+        # Same request as `modify`, which is proven to fire a complexity signal
+        # and raise a refactor. If this case passed against a request that never
+        # triggered anything, it would prove nothing at all.
+        prompt="/spyglass:spyglass --no-refactor add an encoding parameter to load_records",
+        turns=[
+            "Yes, that's the right function. It should default to utf-8 and be "
+            "passed through to open().",
+            "The plan looks right. Continue.",
+            "Continue.",
+        ],
+        checks=[
+            check_no_jargon,
+            agent_ran("complexity-assessor",
+                      "suppressing refactoring also suppressed the measurement"),
+            agent_skipped("refactor-assessor",
+                          "assessed refactoring despite being told not to"),
+            check_no_implementation,
+        ],
+    ),
+    Case(
+        name="force-tests",
+        description="The test keyword must pull test planning onto a light path "
+                    "that would otherwise skip it.",
+        prompt="/spyglass:spyglass --tests add a function that formats a currency amount",
+        turns=[
+            "Yes, that name and size are fine. Take a float and a three-letter "
+            "currency code, return a string like '1,234.50 EUR'.",
+            "The plan looks right. Continue.",
+            "Continue.",
+        ],
+        checks=[
+            check_no_jargon,
+            agent_ran("test-planner", "the keyword did not force test planning"),
+            check_no_implementation,
+        ],
+    ),
+    Case(
         name="already-done",
         description="Asked for something the code already does, it must say so "
                     "and stop — not design it again.",
