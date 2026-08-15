@@ -713,6 +713,8 @@ Not user-initiated in normal use — the skill decides refactoring is worth asse
 - **`after-current-task`** → `future-tasks.md`, with motivating signal and evidence, so a future session understands why it was raised. Produced even on a single-session run.
 - **Not adopted** → `session-context.md`, with its signal and the fact the user declined, so it is not re-litigated from scratch next session.
 
+**Never name the signal to the user.** HIL-7's original template gave `"S1: parse_records is radon grade D"` as its worked example of what to present, and a behavioural run duly told the user `"S1 fired — the function being touched is dense"`. This is the one checkpoint whose entire subject is an internal signal, which makes it the one most likely to leak — so it presents the finding instead: *"your change touches `load_records`, which is already dense — radon grades it C"*. The user needs the evidence, not the identifier that filed it.
+
 → **HIL-7**
 
 ### Phase 10 — Test Planning (`test-planner`) — Conditional
