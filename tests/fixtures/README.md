@@ -93,6 +93,8 @@ asked for.
 | `reuse` | The reuse phase actually runs, finds the planted duplicate, and gives the declared dependency a reasoned verdict | P1, P4 |
 | `dont-write-it` | When existing code already does the job, it recommends using it instead of designing a duplicate | P1 |
 | `modify` | Changing existing code skips the reuse hunt, but still measures complexity and raises refactoring unprompted | P2 |
+| `no-refactor` | The suppression keyword beats a signal that really fired, without suppressing the measurement | P2 |
+| `force-tests` | The test keyword pulls test planning onto a light path that skips it by default | P4 |
 | `already-done` | Asked for something the code already does, it says so and stops | P2 |
 | `patterns` | A cross-cutting request takes the full path and reports that the target directory's conventions disagree | P3 |
 | `holds-out` | Fed non-answers to a question that decides the design, it keeps asking rather than guessing | — |
@@ -104,6 +106,17 @@ the same thing from different angles: **not building something**. That is
 deliberate. Recommending a new function where `normalise_date` already exists is
 the reimplementation failure this plugin exists to prevent, and a design process
 that cannot say "no work needed" will always find work.
+
+### A case can be made obsolete by an improvement
+
+`dont-write-it` used to require all four investigation agents. Once the
+clarification checkpoint existed, they stopped running: it recognises
+`normalise_date` at the second turn and offers to stop, reaching the same answer
+without spending them. The check failed a run that was cheaper and just as right.
+
+When a case fails, the first question is not "what broke" but "is this still the
+right thing to ask for". Three of the failures in this suite's history were the
+plugin being right and the case being wrong.
 
 Run `tests/selftest-harness.py` first — it costs nothing and catches harness bugs
 that would otherwise be discovered minutes and several agents into a live run.
