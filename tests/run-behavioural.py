@@ -447,13 +447,19 @@ CASES = [
             "Yes, that name and size are fine. The input is loose human-written "
             "date strings like '2026-01-15' or '15/01/2026' — the same kind of "
             "thing the project already deals with.",
-            "The plan looks right. Go ahead and check what already exists.",
-            "Continue.",
+            "Use it as it is, then — nothing new needed.",
         ],
         checks=[
             check_no_jargon,
-            check_investigation_ran,
+            # This case used to require the four investigation agents. Once the
+            # clarification checkpoint existed, they stopped running — it
+            # recognised normalise_date at the second turn and offered to stop,
+            # reaching the same answer without spending them. Demanding the
+            # investigation would now fail the run for being cheaper and just as
+            # right. `reuse` still covers the investigation actually running.
+            check_offered_doing_nothing,
             check_recommends_reuse,
+            check_no_plan_written,
             check_gitignore_untouched,
             check_no_implementation,
         ],
