@@ -701,6 +701,8 @@ No HIL of its own. If S1 fires, the report is evidence at HIL-7. If nothing fire
 
 A behavioural run skipped the complexity measurement too, and a re-run of the same case did not. The spec named Phase 9 as the thing suppressed and left Phase 8's fate to inference, so the model inferred it differently each time. Phase 8 now says outright that it still runs: knowing a change lands in a dense function is worth having even when the decision not to restructure it has already been made.
 
+That was not the whole story. With the wording fixed, the case still failed intermittently — and the failing runs had assessed complexity perfectly well, inline on the main instance, without dispatching the agent. Phase 8's text described the agent's by-eye fallback for when radon is missing, and the main instance adopted it as its own. So the phase now opens by saying it *is* the agent, and that the fallback describes what happens inside the dispatch rather than instead of it. Three of this plugin's four behavioural bugs have been prose that described an agent's behaviour and was read as an instruction to the reader.
+
 Not user-initiated in normal use — the skill decides refactoring is worth assessing from what preceding phases observed.
 
 **Input:** fired signals with evidence, `pseudocode.md`, complexity report (if run), pattern report (if run).

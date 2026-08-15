@@ -489,7 +489,8 @@ CASES = [
             agent_skipped("scope-assessor",
                           "re-checked scope on a single-parameter change"),
             agent_ran("complexity-assessor",
-                      "modified an existing function without measuring it"),
+                      "no complexity agent — either never measured, or measured "
+                      "inline on the main instance instead of delegating"),
             check_complexity_reported,
             check_refactor_unasked,
             check_gitignore_untouched,
@@ -513,7 +514,8 @@ CASES = [
         checks=[
             check_no_jargon,
             agent_ran("complexity-assessor",
-                      "suppressing refactoring also suppressed the measurement"),
+                      "no complexity agent — either skipped with the refactor phase, "
+                      "or assessed inline on the main instance"),
             agent_skipped("refactor-assessor",
                           "assessed refactoring despite being told not to"),
             check_no_implementation,
