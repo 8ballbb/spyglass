@@ -810,6 +810,13 @@ def run_case(case: Case, dry: bool, model: str | None) -> bool:
             session = s or session
             transcript = transcript + more
 
+        # Per case, not per run: `--case all` used to leave only the last
+        # transcript on disk, so diagnosing an earlier failure meant paying for
+        # the run again. The last-* names stay as a convenience for single runs.
+        out_dir = REPO / "tests/.transcripts"
+        out_dir.mkdir(exist_ok=True)
+        (out_dir / f"{case.name}.full.txt").write_text(transcript.full)
+        (out_dir / f"{case.name}.visible.txt").write_text(transcript.visible)
         (REPO / "tests/.last-transcript.txt").write_text(transcript.full)
         (REPO / "tests/.last-visible.txt").write_text(transcript.visible)
 
