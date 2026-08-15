@@ -26,7 +26,7 @@ A Claude Code plugin providing a skill that enforces disciplined Python developm
 - `/spyglass:spyglass <task description>` — standard run
 - `/spyglass:spyglass --tests <task description>` — force test planning
 - `/spyglass:spyglass --refactor <task description>` — force refactor assessment even when no signal fires
-- `/spyglass:spyglass --no-refactor <task description>` — suppress refactor assessment even when signals fire
+- `/spyglass:spyglass --no-refactor <task description>` — suppress refactor assessment even when signals fire (complexity is still measured)
 - `/spyglass:spyglass --complete <feature-slug>` — mark a feature complete and write summary
 
 These are keywords recognised in the invocation text, not CLI flags.
@@ -372,7 +372,7 @@ Refactor assessment is not something the user has to ask for. The skill watches 
 | **S3 — Plan pushes existing code over a limit** | Phase 4b + Phase 7 | The plan would take an existing class past 200 lines, or give a module a second distinct responsibility |
 | **S4 — Inconsistent patterns in the target area** | Phase 3 | The pattern analyser reports `inconsistent` for any pattern in the directories being touched — new code cannot follow a convention that does not exist |
 
-**Overrides:** `--refactor` forces Phase 9 without a signal; `--no-refactor` suppresses it despite one.
+**Overrides:** `--refactor` forces Phase 9 without a signal; `--no-refactor` suppresses **Phase 9 only** despite one — Phase 8 still measures.
 
 **When no signal fires and no keyword is given**, Phase 9 does not run and Phase 8's complexity report is folded into the Phase 12 summary — visible, without a checkpoint interrupting for a decision with nothing behind it.
 
@@ -697,7 +697,9 @@ No HIL of its own. If S1 fires, the report is evidence at HIL-7. If nothing fire
 
 ### Phase 9 — Refactor Assessment (`refactor-assessor`) — Conditional
 
-**Trigger:** any of S1–S4 fired, or `--refactor`. Suppressed by `--no-refactor`.
+**Trigger:** any of S1–S4 fired, or `--refactor`. Suppressed by `--no-refactor` — this phase only.
+
+A behavioural run skipped the complexity measurement too, and a re-run of the same case did not. The spec named Phase 9 as the thing suppressed and left Phase 8's fate to inference, so the model inferred it differently each time. Phase 8 now says outright that it still runs: knowing a change lands in a dense function is worth having even when the decision not to restructure it has already been made.
 
 Not user-initiated in normal use — the skill decides refactoring is worth assessing from what preceding phases observed.
 

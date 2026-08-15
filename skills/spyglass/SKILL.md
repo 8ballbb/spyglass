@@ -13,7 +13,7 @@ Structured design analysis before any Python implementation. It prevents reimple
 
 **Terminal state.** This skill produces design artefacts and stops at Phase 12. It does not implement. Implementation happens only after an explicit choice at HIL-10 — never on the skill's own initiative, and never as an inferred continuation.
 
-**Invocation keywords** — recognised in the invocation text, not CLI flags: `--tests` forces test planning (Phase 10); `--refactor` forces refactor assessment even when no signal fires; `--no-refactor` suppresses it even when signals fire; `--complete <feature-slug>` marks a feature complete and writes its summary. Scope: Python projects only.
+**Invocation keywords** — recognised in the invocation text, not CLI flags: `--tests` forces test planning (Phase 10); `--refactor` forces refactor assessment even when no signal fires; `--no-refactor` suppresses it even when signals fire (complexity is still measured); `--complete <feature-slug>` marks a feature complete and writes its summary. Scope: Python projects only.
 
 ## Speaking to the User
 
@@ -271,7 +271,7 @@ Confirms or clears **S3** using the post-HIL-6 state — a hard-violation fix ma
 
 ### Phase 8 — Complexity Assessment — Conditional — `spyglass:complexity-assessor`
 
-**Trigger:** the task modifies existing Python files rather than being purely net-new.
+**Trigger:** the task modifies existing Python files rather than being purely net-new. **`--no-refactor` does not suppress this phase** — it suppresses Phase 9. Knowing your change lands in a dense function is useful even when you have already decided not to restructure it, and it is the one moment someone is looking at that function anyway.
 
 **Receives:** the list of existing Python file **paths** the task will modify, and `module_design` so the agent knows which functions sit in the change path. Pass paths, not file contents — the agent has `Read` and fetches what it needs itself.
 
@@ -283,7 +283,7 @@ No HIL of its own. If S1 fires, the report is evidence at HIL-7. If nothing fire
 
 ### Phase 9 — Refactor Assessment — Conditional — `spyglass:refactor-assessor`
 
-**Trigger:** any of S1–S4 fired, or `--refactor`. Suppressed by `--no-refactor`. Not user-initiated in normal use.
+**Trigger:** any of S1–S4 fired, or `--refactor`. Suppressed by `--no-refactor` — **this phase only**; Phase 8 still measures, and its finding folds into the Phase 12 summary instead of into a recommendation. Not user-initiated in normal use.
 
 **Receives:** fired signals with evidence, `pseudocode.md`, complexity report (if run), pattern report (if run). **Scope cap:** maximum 5 recommendations, restricted to files the task already touches. If more candidates exist, report the count dropped rather than silently truncating.
 
@@ -333,7 +333,7 @@ Refactor assessment is not something the user has to ask for. Watch for four sig
 | **S3 — Plan pushes existing code over a limit** | Phase 4b + Phase 7 | The plan would take an existing class past 200 lines, or give a module a second distinct responsibility |
 | **S4 — Inconsistent patterns in the target area** | Phase 3 | The pattern analyser reports `inconsistent` for any pattern in the directories being touched — new code cannot follow a convention that does not exist |
 
-**Overrides:** `--refactor` forces Phase 9 without a signal; `--no-refactor` suppresses it despite one.
+**Overrides:** `--refactor` forces Phase 9 without a signal; `--no-refactor` suppresses **Phase 9 only** despite one — Phase 8 still measures.
 
 **When no signal fires and no keyword is given:** Phase 9 does not run, and Phase 8's complexity report folds into the Phase 12 summary — visible, without a checkpoint interrupting for a decision with nothing behind it.
 
