@@ -855,6 +855,11 @@ def main() -> None:
     ap.add_argument("--dry-run", action="store_true",
                     help="show what would run, spend nothing")
     ap.add_argument("--model", help="override the model for the run under test")
+    ap.add_argument("--repeat", type=int, default=1, metavar="N",
+                    help="run each case N times and report the pass rate. "
+                         "Intermittent behaviour is a real failure class and a "
+                         "single run cannot see it: --no-refactor passed, failed, "
+                         "passed, failed against identical input")
     args = ap.parse_args()
 
     if args.list:
@@ -871,9 +876,23 @@ def main() -> None:
     if not shutil.which("claude"):
         sys.exit("claude CLI not found on PATH")
 
-    ok = all(run_case(c, args.dry_run, args.model) for c in selected)
+    tally: dict[str, list[bool]] = {}
+    for c in selected:
+        for _ in range(max(1, args.repeat)):
+            tally.setdefault(c.name, []).append(
+                run_case(c, args.dry_run, args.model))
+
+    ok = all(all(v) for v in tally.values())
     if not args.dry_run:
         print()
+        if args.repeat > 1:
+            # Report the rate, not just the verdict. "3/5" and "0/5" are very
+            # different bugs: one is an ambiguous instruction the model resolves
+            # differently each time, the other is behaviour that simply is not
+            # there.
+            for name, runs in tally.items():
+                print(f"  {name:<14} {sum(runs)}/{len(runs)} passed")
+            print()
         print("All cases passed." if ok else "Some cases failed — see above.")
     sys.exit(0 if ok else 1)
 
