@@ -303,6 +303,121 @@ expect("ends on a question passes", h.check_stopped_for_input(asked, None).ok, T
 ploughed, _ = h.harvest(stream(text("Done. I have written the function.")))
 expect("no question fails", h.check_stopped_for_input(ploughed, None).ok, False)
 
+
+print("\n── graders for the durable output ──────────────────────────────────────")
+
+def with_files(files, *blocks):
+    """A one-turn transcript with a given artefact tree."""
+    t, _ = h.harvest(stream(*blocks) if blocks else stream(text("...")))
+    t.files = files
+    return t
+
+FULL = {
+    "INDEX.md": "# Index",
+    "PLANS_INDEX.md": "| pad-id | in-progress |",
+    "pad-id/pseudocode.md": "# pad-id\n\n## Module design\nx\n## Contracts\ny\n## Signatures\nz",
+    "pad-id/session-context.md": "decisions",
+}
+
+print("\ncheck_artefact_set")
+expect("a complete set passes", h.check_artefact_set(with_files(FULL), None).ok, True)
+missing = {k: v for k, v in FULL.items() if k != "PLANS_INDEX.md"}
+expect("a missing index fails", h.check_artefact_set(with_files(missing), None).ok, False)
+expect("no artefacts at all fails", h.check_artefact_set(with_files({}), None).ok, False)
+
+print("\ncheck_plan_headings")
+expect("the prescribed headings pass", h.check_plan_headings(with_files(FULL), None).ok, True)
+staged = dict(FULL, **{"pad-id/pseudocode.md": "# pad-id\n\n## Level 1 — Module design\nx"})
+expect("internal stage names fail", h.check_plan_headings(with_files(staged), None).ok, False)
+partial = dict(FULL, **{"pad-id/pseudocode.md": "# pad-id\n\n## Module design\nx"})
+expect("missing sections fail", h.check_plan_headings(with_files(partial), None).ok, False)
+
+print("\ncheck_summary_written_after_confirming — ordering, not existence")
+before = with_files({})
+after = with_files({"pad-id/completed-summary.md": "done"})
+expect("drafted then written passes",
+       h.check_summary_written_after_confirming(before + after, None).ok, True)
+# The failure a final snapshot cannot see: written first, asked afterwards.
+early = with_files({"pad-id/completed-summary.md": "done"})
+expect("written before confirming fails",
+       h.check_summary_written_after_confirming(early + after, None).ok, False)
+expect("never written fails",
+       h.check_summary_written_after_confirming(before + with_files({}), None).ok, False)
+
+print("\ncheck_marked_complete")
+expect("a complete status passes",
+       h.check_marked_complete(with_files({"PLANS_INDEX.md": "| pad-id | complete |"}), None).ok, True)
+expect("still in progress fails",
+       h.check_marked_complete(with_files({"PLANS_INDEX.md": "| pad-id | in-progress |"}), None).ok, False)
+
+print("\ncheck_plan_not_regenerated — a rewritten plan is not a resumed one")
+key = f"{h.ORPHAN_SLUG}/pseudocode.md"
+expect("an untouched plan passes",
+       h.check_plan_not_regenerated(with_files({key: h.ORPHAN_PLAN}), None).ok, True)
+expect("a rewritten plan fails",
+       h.check_plan_not_regenerated(with_files({key: h.ORPHAN_PLAN + "\nextra"}), None).ok, False)
+expect("a deleted plan fails", h.check_plan_not_regenerated(with_files({}), None).ok, False)
+
+print("\ncheck_spotted_orphan")
+spotted, _ = h.harvest(stream(text("Found an incomplete plan from a previous session.")))
+expect("noticing it passes", h.check_spotted_orphan(spotted, None).ok, True)
+blind, _ = h.harvest(stream(text("I'm calling this work cache-layer. Nothing to carry over.")))
+expect("starting fresh fails", h.check_spotted_orphan(blind, None).ok, False)
+
+print("\ncheck_two_features_indexed")
+two = with_files({"PLANS_INDEX.md": "| fmt-currency | done |\n| pad-id | open |",
+                  "fmt-currency/pseudocode.md": "a", "pad-id/pseudocode.md": "b"})
+expect("both listed passes", h.check_two_features_indexed(two, None).ok, True)
+one = with_files({"PLANS_INDEX.md": "| pad-id | open |",
+                  "fmt-currency/pseudocode.md": "a", "pad-id/pseudocode.md": "b"})
+expect("an overwritten index fails", h.check_two_features_indexed(one, None).ok, False)
+
+print("\ncheck_referenced_prior_work")
+denied, _ = h.harvest(stream(text("Nothing from previous sessions to carry over.")))
+expect("denying prior work fails", h.check_referenced_prior_work(denied, None).ok, False)
+aware, _ = h.harvest(stream(text("There's an earlier plan here for formatting currency.")))
+expect("noticing it passes", h.check_referenced_prior_work(aware, None).ok, True)
+
+print("\ncheck_hard_violation_raised")
+blocked, _ = h.harvest(stream(text("Hard violation: the function exceeds 40 lines.")))
+expect("a blocking finding passes", h.check_hard_violation_raised(blocked, None).ok, True)
+waved, _ = h.harvest(stream(text("Style review found no violations, hard or advisory.")))
+expect("waving it through fails", h.check_hard_violation_raised(waved, None).ok, False)
+
+print("\ncheck_partial_use_verdict")
+middle, _ = h.harvest(stream(text(
+    "normalise_date covers the parsing but not the future check — extend it.")))
+expect("a middle verdict passes", h.check_partial_use_verdict(middle, None).ok, True)
+binary, _ = h.harvest(stream(text("Nothing relevant exists. Write it from scratch.")))
+expect("an all-or-nothing verdict fails", h.check_partial_use_verdict(binary, None).ok, False)
+
+print("\ncheck_multi_session and check_future_tasks_written")
+big, _ = h.harvest(stream(text("This is too large for one session; here are the sub-tasks.")))
+expect("splitting passes", h.check_multi_session(big, None).ok, True)
+small, _ = h.harvest(stream(text("This all fits comfortably in one go.")))
+expect("treating it as one sitting fails", h.check_multi_session(small, None).ok, False)
+expect("future-tasks written passes",
+       h.check_future_tasks_written(with_files({"x/future-tasks.md": "later"}), None).ok, True)
+expect("no future-tasks fails",
+       h.check_future_tasks_written(with_files(FULL), None).ok, False)
+
+print("\ncheck_dependency_evidence — and the CVE claim it must never make")
+evidenced, _ = h.harvest(stream(
+    tool("Agent", subagent_type="spyglass:package-searcher", prompt="find one"),
+    text("user-agents is actively maintained, last release 4 months ago, widely used.")))
+expect("adoption evidence passes", h.check_dependency_evidence(evidenced, None).ok, True)
+lying, _ = h.harvest(stream(
+    tool("Agent", subagent_type="spyglass:package-searcher", prompt="find one"),
+    text("ua-parser is well maintained and has no known CVEs.")))
+expect("an unverifiable clean bill fails",
+       h.check_dependency_evidence(lying, None).ok, False)
+bare, _ = h.harvest(stream(
+    tool("Agent", subagent_type="spyglass:package-searcher", prompt="find one"),
+    text("Use ua-parser.")))
+expect("no evidence fails", h.check_dependency_evidence(bare, None).ok, False)
+nosearch, _ = h.harvest(stream(text("I'd suggest ua-parser, it's popular.")))
+expect("never searching fails", h.check_dependency_evidence(nosearch, None).ok, False)
+
 print()
 if failures:
     print(f"{len(failures)} harness self-test(s) failed — fix before spending a run.")
