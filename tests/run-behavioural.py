@@ -559,7 +559,17 @@ def check_referenced_prior_work(t: "Transcript", _) -> Result:
 
 
 def check_hard_violation_raised(t: "Transcript", _) -> Result:
-    """A style review that never blocks anything is decoration."""
+    """A style review that never blocks anything is decoration.
+
+    The dispatch is part of the assertion, not a separate nicety. Without it
+    this passed on the main instance predicting its own future — "this will
+    likely land at or over the length a later check flags as too long" — in a
+    run where the style review never happened. A promise and a finding read
+    identically to a regex; only the dispatch tells them apart.
+    """
+    if "style-checker" not in t.full:
+        return Result("raised a blocking style violation", False,
+                      "no style review ran, so any mention of length is a guess")
     found = re.search(r"(hard|blocking) violation|must be fixed|"
                       r"exceeds .{0,40}(line|limit)|too (long|large)|"
                       r"split (it|this|the function)|over 40 lines",
@@ -952,7 +962,10 @@ CASES = [
             "function that handles all twelve rules — that's what I want.",
             "The structure looks right. Continue.",
             "The plan looks right. Continue.",
+            "Scope is fine as one session. Continue.",
             "Continue.",
+            "Yes, that's right. Continue.",
+            "Yes, that all looks right. Continue.",
         ],
         checks=[
             check_no_jargon,
@@ -971,7 +984,10 @@ CASES = [
             "Yes, that name and size are fine. Loose date strings in, ISO-8601 "
             "out, and raise if the date is after today.",
             "The plan looks right. Go ahead and check what already exists.",
+            "Scope is fine as one session. Continue.",
             "Continue.",
+            "Yes, that's right. Continue.",
+            "Yes, that all looks right. Continue.",
         ],
         checks=[
             check_no_jargon,

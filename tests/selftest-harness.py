@@ -389,11 +389,25 @@ expect("denying prior work fails", h.check_referenced_prior_work(denied, None).o
 aware, _ = h.harvest(stream(text("There's an earlier plan here for formatting currency.")))
 expect("noticing it passes", h.check_referenced_prior_work(aware, None).ok, True)
 
-print("\ncheck_hard_violation_raised")
-blocked, _ = h.harvest(stream(text("Hard violation: the function exceeds 40 lines.")))
-expect("a blocking finding passes", h.check_hard_violation_raised(blocked, None).ok, True)
-waved, _ = h.harvest(stream(text("Style review found no violations, hard or advisory.")))
-expect("waving it through fails", h.check_hard_violation_raised(waved, None).ok, False)
+print("\ncheck_hard_violation_raised — a prediction is not a review")
+def styled(*blocks):
+    return h.harvest(stream(
+        tool("Agent", subagent_type="spyglass:style-checker", prompt="review it"),
+        *blocks))[0]
+
+expect("a blocking finding passes",
+       h.check_hard_violation_raised(
+           styled(text("Hard violation: the function exceeds 40 lines.")), None).ok, True)
+expect("waving it through fails",
+       h.check_hard_violation_raised(
+           styled(text("Style review found no violations, hard or advisory.")), None).ok, False)
+# Caught live: the main instance predicting its own future scored as a finding
+# in a run where the style review never happened.
+predicted, _ = h.harvest(stream(text(
+    "With twelve rules in one function this will likely land at or over the "
+    "length a later check flags as too long.")))
+expect("a prediction with no review fails",
+       h.check_hard_violation_raised(predicted, None).ok, False)
 
 print("\ncheck_partial_use_verdict")
 middle, _ = h.harvest(stream(text(
