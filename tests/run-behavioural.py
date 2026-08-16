@@ -772,7 +772,12 @@ def workdir(case: Case) -> tuple[Path, Path | None]:
     return tmp, tmp
 
 
-def run_case(case: Case, dry: bool, model: str | None) -> bool:
+def run_case(case: Case, dry: bool, model: str | None) -> bool | None:
+    """True passed, False failed, None never ran.
+
+    None is not a soft failure. A run that died before it started has no
+    opinion about the plugin, and folding it into a pass rate invents one.
+    """
     print(f"\n{'─' * 78}\n{case.name}  —  {case.description}\n{'─' * 78}")
 
     # bypassPermissions: the fixture is disposable test data, reset before every
@@ -805,7 +810,7 @@ def run_case(case: Case, dry: bool, model: str | None) -> bool:
         for i, turn in enumerate(case.turns, 1):
             if not session:
                 print("  ! no session id returned; cannot continue the conversation")
-                return False
+                return None
             print(f"  answering checkpoint {i}/{len(case.turns)}…")
             _, out_n = sh(base + ["--resume", session, turn], cwd=cwd)
             more, s = harvest(out_n)
@@ -826,7 +831,7 @@ def run_case(case: Case, dry: bool, model: str | None) -> bool:
         if why:
             print(f"\n  ABORTED — {why}.")
             print("  Not graded: nothing here reflects the plugin's behaviour.")
-            return False
+            return None
 
         results = [c(transcript, case) for c in case.checks]
     finally:
@@ -876,13 +881,14 @@ def main() -> None:
     if not shutil.which("claude"):
         sys.exit("claude CLI not found on PATH")
 
-    tally: dict[str, list[bool]] = {}
+    tally: dict[str, list[bool | None]] = {}
     for c in selected:
         for _ in range(max(1, args.repeat)):
             tally.setdefault(c.name, []).append(
                 run_case(c, args.dry_run, args.model))
 
-    ok = all(all(v) for v in tally.values())
+    graded = {n: [r for r in runs if r is not None] for n, runs in tally.items()}
+    ok = all(all(v) for v in graded.values()) and any(graded.values())
     if not args.dry_run:
         print()
         if args.repeat > 1:
@@ -891,9 +897,15 @@ def main() -> None:
             # differently each time, the other is behaviour that simply is not
             # there.
             for name, runs in tally.items():
-                print(f"  {name:<14} {sum(runs)}/{len(runs)} passed")
+                done = graded[name]
+                lost = len(runs) - len(done)
+                note = f"  ({lost} never ran)" if lost else ""
+                print(f"  {name:<14} {sum(done)}/{len(done)} passed{note}")
             print()
-        print("All cases passed." if ok else "Some cases failed — see above.")
+        if not any(graded.values()):
+            print("Nothing was graded — every run died before it started.")
+        else:
+            print("All cases passed." if ok else "Some cases failed — see above.")
     sys.exit(0 if ok else 1)
 
 
