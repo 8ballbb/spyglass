@@ -699,9 +699,11 @@ No HIL of its own. If S1 fires, the report is evidence at HIL-7. If nothing fire
 
 **Trigger:** any of S1–S4 fired, or `--refactor`. Suppressed by `--no-refactor` — this phase only.
 
-A behavioural run skipped the complexity measurement too, and a re-run of the same case did not. The spec named Phase 9 as the thing suppressed and left Phase 8's fate to inference, so the model inferred it differently each time. Phase 8 now says outright that it still runs: knowing a change lands in a dense function is worth having even when the decision not to restructure it has already been made.
+**A correction, and the reason both clarifications below are worth keeping anyway.**
 
-That was not the whole story. With the wording fixed, the case still failed intermittently — and the failing runs had assessed complexity perfectly well, inline on the main instance, without dispatching the agent. Phase 8's text described the agent's by-eye fallback for when radon is missing, and the main instance adopted it as its own. So the phase now opens by saying it *is* the agent, and that the fallback describes what happens inside the dispatch rather than instead of it. Three of this plugin's four behavioural bugs have been prose that described an agent's behaviour and was read as an instruction to the reader.
+The `no-refactor` behavioural case passed, failed, passed and failed against identical input, and the failing runs appeared to skip the complexity assessment — first entirely, then by doing it inline on the main instance. Neither happened. The agent was dispatched every time. The harness truncated each tool call's arguments to 400 characters, and `subagent_type` is serialised after the dispatch prompt, so whether an agent looked dispatched depended on how long its prompt happened to be. The flakiness was in the grader.
+
+What survived the correction: this section named Phase 9 as the thing `--no-refactor` suppresses and left Phase 8's fate to inference, and Phase 8's own text described the agent's by-eye radon fallback in a way a reader could take for their own. Both were genuinely ambiguous whether or not any run tripped over them, so both are now explicit — Phase 8 always runs and is always the agent. The behavioural evidence for them was an artefact; the ambiguity was not.
 
 Not user-initiated in normal use — the skill decides refactoring is worth assessing from what preceding phases observed.
 

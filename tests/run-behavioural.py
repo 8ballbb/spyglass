@@ -703,8 +703,17 @@ def harvest(stream: str) -> tuple[Transcript, str | None]:
                     if not from_subagent:
                         spoken.append(block.get("text", ""))
                 elif block.get("type") == "tool_use":
+                    inp = block.get("input", {}) or {}
+                    # subagent_type first, and never truncated. It is serialised
+                    # after a long `prompt`, so the 400-char cut below used to
+                    # drop it — and whether an agent looked dispatched then
+                    # depended on how long its dispatch prompt happened to be.
+                    # That, not the plugin, was the source of a case that passed,
+                    # failed, passed and failed against identical input.
+                    who = inp.get("subagent_type", "")
                     parts.append(f"[tool:{block.get('name')}] "
-                                 + json.dumps(block.get("input", {}))[:400])
+                                 + (f"subagent_type={who} " if who else "")
+                                 + json.dumps(inp)[:400])
         if isinstance(ev.get("result"), str):
             spoken.append(ev["result"])
             parts.append(ev["result"])

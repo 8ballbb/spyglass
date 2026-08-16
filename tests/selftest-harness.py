@@ -145,6 +145,21 @@ duplicate, _ = h.harvest(stream(text(
     "There is a normalise_date in timeutils.py. I'll add a separate function.")))
 expect("found-but-duplicated fails", h.check_recommends_reuse(duplicate, None).ok, False)
 
+print("\ndispatch survives a long prompt (the flakiness that was mine, not the plugin's)")
+verbose, _ = h.harvest(stream(tool(
+    "Agent",
+    description="Complexity assessment of load_records",
+    # Real dispatch prompts run to hundreds of characters, and subagent_type is
+    # serialised after them. Truncating the input dropped it, so an agent looked
+    # dispatched or not depending on how wordy its prompt was.
+    prompt="Assess the cyclomatic complexity of the function this task will "
+           "modify. " + "Measure it carefully and report per function. " * 12,
+    subagent_type="spyglass:complexity-assessor")))
+expect("a long-prompt dispatch is still seen",
+       h.agent_ran("complexity-assessor", "why")(verbose, None).ok, True)
+expect("and does not read as skipped",
+       h.agent_skipped("complexity-assessor", "why")(verbose, None).ok, False)
+
 print("\nagent_ran / agent_skipped — the light paths are defined by what they omit")
 dispatched, _ = h.harvest(stream(tool("Task", subagent_type="spyglass:complexity-assessor")))
 expect("agent_ran passes when dispatched",
