@@ -71,7 +71,18 @@ tests/run-behavioural.py --list      # show cases, spend nothing
 tests/run-behavioural.py --dry-run   # show the commands, spend nothing
 tests/run-behavioural.py             # run the default case
 tests/run-behavioural.py --case all  # run everything
+tests/run-behavioural.py --case X --repeat 5   # pass rate, not a verdict
 ```
+
+`--repeat` exists because intermittent behaviour is a real failure class and a
+single run cannot see it. `no-refactor` passed, failed, passed, failed against
+identical input — the spec named the phase that `--no-refactor` suppresses and
+left the neighbouring phase's fate to inference, so the model inferred it
+differently each time. `3/5` and `0/5` are different bugs: an ambiguous
+instruction, versus behaviour that is not there at all.
+
+Runs that die before they start are reported separately and excluded from the
+rate. A run with no opinion about the plugin should not contribute one.
 
 Every assertion is deterministic — string and filesystem checks, no LLM judge. A
 grader that needs a model to decide whether it passed is a grader that can
