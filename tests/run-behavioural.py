@@ -416,17 +416,22 @@ def check_said_no_project(t: "Transcript", _) -> Result:
 # afterwards, which is the plugin's actual product: a design someone can pick up
 # in a later session. It went untested far longer than it should have.
 
-REQUIRED_ARTEFACTS = ["INDEX.md", "PLANS_INDEX.md"]
+# PLANS_INDEX.md sits at the root; everything else lives inside the feature
+# folder. Worth stating precisely: an early version of this check looked for
+# INDEX.md at the root and failed a run that had put it in exactly the right
+# place. Matching by suffix alone is no good either — "PLANS_INDEX.md" ends with
+# "INDEX.md".
+ROOT_ARTEFACTS = ["PLANS_INDEX.md"]
+FEATURE_ARTEFACTS = ["INDEX.md", "pseudocode.md", "session-context.md"]
 
 
 def check_artefact_set(t: "Transcript", _) -> Result:
     """The files a finished run promises to leave behind."""
     have = set(t.files)
-    missing = [f for f in REQUIRED_ARTEFACTS if f not in have]
-    if not any(f.endswith("pseudocode.md") for f in have):
-        missing.append("<slug>/pseudocode.md")
-    if not any(f.endswith("session-context.md") for f in have):
-        missing.append("<slug>/session-context.md")
+    missing = [f for f in ROOT_ARTEFACTS if f not in have]
+    for name in FEATURE_ARTEFACTS:
+        if not any(k.split("/")[-1] == name and "/" in k for k in have):
+            missing.append(f"<slug>/{name}")
     return Result("wrote the artefacts it promises", not missing,
                   "missing: " + ", ".join(missing) if missing
                   else ", ".join(sorted(have)))
@@ -856,6 +861,8 @@ CASES = [
             "currency code, return a string like '1,234.50 EUR'.",
             "The plan looks right. Continue.",
             "Continue.",
+            "Yes, that all looks right. Continue.",
+            "Yes, that's right. Continue.",
             "Yes, write those notes.",
         ],
         checks=[
@@ -874,6 +881,8 @@ CASES = [
             "currency code, return a string like '1,234.50 EUR'.",
             "The plan looks right. Continue.",
             "Continue.",
+            "Yes, that all looks right. Continue.",
+            "Yes, that's right. Continue.",
             "Yes, write those notes.",
         ],
         wants_slug=True,
@@ -910,6 +919,8 @@ CASES = [
             "currency code, return a string like '1,234.50 EUR'.",
             "The plan looks right. Continue.",
             "Continue.",
+            "Yes, that all looks right. Continue.",
+            "Yes, that's right. Continue.",
             "Yes, write those notes.",
         ],
         prompt="/spyglass:spyglass add a function that pads an id to eight digits",
@@ -917,6 +928,8 @@ CASES = [
             "Yes, that name and size are fine. Pad with leading zeros.",
             "The plan looks right. Continue.",
             "Continue.",
+            "Yes, that all looks right. Continue.",
+            "Yes, that's right. Continue.",
             "Yes, write those notes.",
         ],
         checks=[

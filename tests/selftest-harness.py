@@ -313,8 +313,8 @@ def with_files(files, *blocks):
     return t
 
 FULL = {
-    "INDEX.md": "# Index",
     "PLANS_INDEX.md": "| pad-id | in-progress |",
+    "pad-id/INDEX.md": "# Index",
     "pad-id/pseudocode.md": "# pad-id\n\n## Module design\nx\n## Contracts\ny\n## Signatures\nz",
     "pad-id/session-context.md": "decisions",
 }
@@ -322,8 +322,19 @@ FULL = {
 print("\ncheck_artefact_set")
 expect("a complete set passes", h.check_artefact_set(with_files(FULL), None).ok, True)
 missing = {k: v for k, v in FULL.items() if k != "PLANS_INDEX.md"}
-expect("a missing index fails", h.check_artefact_set(with_files(missing), None).ok, False)
+expect("a missing root index fails", h.check_artefact_set(with_files(missing), None).ok, False)
 expect("no artefacts at all fails", h.check_artefact_set(with_files({}), None).ok, False)
+# The per-feature INDEX.md lives inside the folder. Looking for it at the root
+# failed a run that had put it exactly where the spec says.
+misplaced = {k: v for k, v in FULL.items() if k != "pad-id/INDEX.md"}
+misplaced["INDEX.md"] = "# Index"
+expect("a root-level INDEX.md does not satisfy the per-feature one",
+       h.check_artefact_set(with_files(misplaced), None).ok, False)
+# And PLANS_INDEX.md must not be mistaken for it — it ends with the same text.
+only_plans = {"PLANS_INDEX.md": "x", "pad-id/pseudocode.md": "y",
+              "pad-id/session-context.md": "z"}
+expect("PLANS_INDEX.md is not the feature index",
+       h.check_artefact_set(with_files(only_plans), None).ok, False)
 
 print("\ncheck_plan_headings")
 expect("the prescribed headings pass", h.check_plan_headings(with_files(FULL), None).ok, True)
