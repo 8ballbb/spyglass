@@ -335,6 +335,8 @@ Refactor assessment is not something the user has to ask for. Watch for four sig
 | **S3 — Plan pushes existing code over a limit** | Phase 4b + Phase 7 | The plan would take an existing class past 200 lines, or give a module a second distinct responsibility |
 | **S4 — Inconsistent patterns in the target area** | Phase 3 | The pattern analyser reports `inconsistent` for any pattern in the directories being touched — new code cannot follow a convention that does not exist |
 
+**`S1`–`S4` are internal identifiers and never appear in a message to the user — including to report that one did *not* fire.** A signal that stayed quiet is not news; it is the machinery working, and narrating it is the leak that has now happened twice. "S1 doesn't fire — `normalise_date` is simple (grade A)" says nothing the user needs and names two things they have never heard of. Either say what was found — "the function you're touching is straightforward, so nothing to restructure there" — or, far better, say nothing and move on.
+
 **Overrides:** `--refactor` forces Phase 9 without a signal; `--no-refactor` suppresses **Phase 9 only** despite one — Phase 8 still measures.
 
 **When no signal fires and no keyword is given:** Phase 9 does not run, and Phase 8's complexity report folds into the Phase 12 summary — visible, without a checkpoint interrupting for a decision with nothing behind it.

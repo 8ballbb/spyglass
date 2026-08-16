@@ -372,6 +372,8 @@ Refactor assessment is not something the user has to ask for. The skill watches 
 | **S3 — Plan pushes existing code over a limit** | Phase 4b + Phase 7 | The plan would take an existing class past 200 lines, or give a module a second distinct responsibility |
 | **S4 — Inconsistent patterns in the target area** | Phase 3 | The pattern analyser reports `inconsistent` for any pattern in the directories being touched — new code cannot follow a convention that does not exist |
 
+**Signal identifiers never reach the user, including to report that one did not fire.** Two behavioural runs leaked one. The first came from HIL-7's own worked example; the second from a progress message between phases — "S1 doesn't fire — `normalise_date` is simple (grade A)". The second is the more instructive: the rest of that sentence named its findings properly, describing the reuse overlap and the docstring inconsistency in plain terms. Only the quiet signal got named, because a signal that does not fire has no finding to describe, leaving its identifier as the only thing to say about it. The answer is to say nothing about it at all.
+
 **Overrides:** `--refactor` forces Phase 9 without a signal; `--no-refactor` suppresses **Phase 9 only** despite one — Phase 8 still measures.
 
 **When no signal fires and no keyword is given**, Phase 9 does not run and Phase 8's complexity report is folded into the Phase 12 summary — visible, without a checkpoint interrupting for a decision with nothing behind it.

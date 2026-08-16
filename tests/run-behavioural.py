@@ -958,8 +958,16 @@ CASES = [
                "twelve separate field rules in one function and reports every "
                "failure it finds, with a distinct error message per rule",
         turns=[
-            "Yes, that name works and there's no prior work. Keep it as one "
-            "function that handles all twelve rules — that's what I want.",
+            # The rules have to be given. An earlier version of this case asked
+            # for "twelve field rules" without saying what they were, and the
+            # run refused to invent business rules on the user's behalf — right,
+            # and it never reached the style review the case exists to test.
+            "Yes, that name works and there's no prior work. The rules: id "
+            "present, id non-empty, id alphanumeric, amount present, amount "
+            "numeric, amount non-negative, amount under 1e9, status present, "
+            "status one of open/closed, date present, date parseable, date not "
+            "in the future. Keep it as one function handling all twelve — "
+            "that's what I want.",
             "The structure looks right. Continue.",
             "The plan looks right. Continue.",
             "Scope is fine as one session. Continue.",
