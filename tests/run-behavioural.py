@@ -71,6 +71,17 @@ class Case:
     # no Python marker and no .git, which is the only way to exercise the
     # no-project fallback — anywhere inside this repo resolves to this repo.
     where: str = "fixture"
+    # A complete prior session — [prompt, *turns] — run and discarded before the
+    # graded one starts. The plugin's stateful behaviour (resuming, indexing,
+    # completing) only exists on a second visit to a project, and a single
+    # scripted conversation can never reach it.
+    setup: list[str] = field(default_factory=list)
+    # Plant artefacts directly, for states a normal run does not produce — an
+    # abandoned session, for instance, which by definition never finished.
+    setup_fs: object = None
+    # `{slug}` in the prompt or turns is replaced with the feature folder that
+    # setup left behind. Slugs are generated, so a case cannot hardcode one.
+    wants_slug: bool = False
 
 
 def sh(cmd: list[str], cwd: Path | None = None, timeout: int = 900) -> tuple[int, str]:
@@ -399,6 +410,205 @@ def check_said_no_project(t: "Transcript", _) -> Result:
                   "" if said else "used the fallback silently — the user has no idea where they are")
 
 
+# ── graders for the durable output ────────────────────────────────────────────
+#
+# Everything above grades the conversation. These grade what is left on disk
+# afterwards, which is the plugin's actual product: a design someone can pick up
+# in a later session. It went untested far longer than it should have.
+
+REQUIRED_ARTEFACTS = ["INDEX.md", "PLANS_INDEX.md"]
+
+
+def check_artefact_set(t: "Transcript", _) -> Result:
+    """The files a finished run promises to leave behind."""
+    have = set(t.files)
+    missing = [f for f in REQUIRED_ARTEFACTS if f not in have]
+    if not any(f.endswith("pseudocode.md") for f in have):
+        missing.append("<slug>/pseudocode.md")
+    if not any(f.endswith("session-context.md") for f in have):
+        missing.append("<slug>/session-context.md")
+    return Result("wrote the artefacts it promises", not missing,
+                  "missing: " + ", ".join(missing) if missing
+                  else ", ".join(sorted(have)))
+
+
+def check_plan_headings(t: "Transcript", _) -> Result:
+    """The plan's own headings, which a user reads and a checkpoint echoes.
+
+    "Level 1" names the stage of writing the plan, not a section of it. It
+    leaked to a user once already, because the artefact's heading format was
+    specified nowhere and the model borrowed the stage names.
+    """
+    plans = {k: v for k, v in t.files.items() if k.endswith("pseudocode.md")}
+    if not plans:
+        return Result("plan uses the prescribed headings", False, "no plan written")
+    body = "\n".join(plans.values())
+    stage_names = re.findall(r"^#+\s*Level [123]\b.*$", body, re.M)
+    wanted = [h for h in ("## Module design", "## Contracts", "## Signatures")
+              if h not in body]
+    if stage_names:
+        return Result("plan uses the prescribed headings", False,
+                      "internal stage names as headings: " + "; ".join(stage_names[:3]))
+    return Result("plan uses the prescribed headings", not wanted,
+                  "missing headings: " + ", ".join(wanted) if wanted else "")
+
+
+def check_summary_written_after_confirming(t: "Transcript", _) -> Result:
+    """Confirmation precedes the write — a property no final snapshot can show.
+
+    The completion flow must draft, present, wait, then write. A run that writes
+    the summary and then asks looks identical at the end to one that did it in
+    the right order.
+    """
+    steps = t.steps
+    if len(steps) < 2:
+        return Result("confirmed before writing the summary", False,
+                      "run had fewer than two turns")
+    early = any(k.endswith("completed-summary.md") for k in steps[0].files)
+    late = any(k.endswith("completed-summary.md") for k in steps[-1].files)
+    if early:
+        return Result("confirmed before writing the summary", False,
+                      "wrote it before asking — the confirmation was decorative")
+    return Result("confirmed before writing the summary", late,
+                  "" if late else "never wrote it, even after confirmation")
+
+
+def check_marked_complete(t: "Transcript", _) -> Result:
+    index = t.files.get("PLANS_INDEX.md", "")
+    if not index:
+        return Result("marked the feature complete", False, "no PLANS_INDEX.md")
+    ok = re.search(r"complete", index, re.I)
+    return Result("marked the feature complete", bool(ok),
+                  "" if ok else "index never records the completed status")
+
+
+ORPHAN_SLUG = "abandoned-cache-layer"
+ORPHAN_PLAN = """# abandoned-cache-layer
+
+## Module design
+`src/dataflow/cache.py` — a read-through cache in front of load_records.
+
+## Contracts
+`get(key)` returns a cached record list or None. Never raises.
+
+## Signatures
+def get(key: str) -> list[dict] | None: ...
+"""
+
+
+def plant_orphan(cwd: Path) -> None:
+    """A session abandoned between writing the plan and writing the index.
+
+    This state cannot be produced by a normal run, because a normal run
+    finishes. It is exactly the state the recovery path exists for.
+    """
+    d = cwd / ".claude/spyglass" / ORPHAN_SLUG
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "pseudocode.md").write_text(ORPHAN_PLAN)
+    ignore = cwd / ".claude/spyglass/.gitignore"
+    if not ignore.exists():
+        ignore.write_text("*\n")
+
+
+def check_spotted_orphan(t: "Transcript", _) -> Result:
+    said = re.search(r"incomplete|unfinished|previous session|abandoned|left off|"
+                     r"already (a|an) plan|resume", t.visible, re.I)
+    return Result("spotted the abandoned session", bool(said),
+                  "" if said else "started fresh without noticing the existing plan")
+
+
+def check_plan_not_regenerated(t: "Transcript", _) -> Result:
+    """Resuming reuses the plan. It does not quietly rewrite it.
+
+    The spec is explicit that the earlier stages are not re-run on resume, and a
+    regenerated plan is the silent failure: it looks like a successful resume
+    while discarding the work being resumed.
+    """
+    key = f"{ORPHAN_SLUG}/pseudocode.md"
+    now = t.files.get(key)
+    if now is None:
+        return Result("kept the existing plan intact", False,
+                      "the planted plan is gone")
+    return Result("kept the existing plan intact", now == ORPHAN_PLAN,
+                  "" if now == ORPHAN_PLAN else "the plan was rewritten rather than resumed")
+
+
+def check_two_features_indexed(t: "Transcript", _) -> Result:
+    """A second run in the same project appends; it does not overwrite."""
+    index = t.files.get("PLANS_INDEX.md", "")
+    if not index:
+        return Result("indexed both pieces of work", False, "no PLANS_INDEX.md")
+    slugs = {k.split("/")[0] for k in t.files if "/" in k}
+    listed = [sl for sl in slugs if sl in index]
+    return Result("indexed both pieces of work", len(listed) >= 2,
+                  f"index lists {len(listed)} of {len(slugs)} feature folders")
+
+
+def check_referenced_prior_work(t: "Transcript", _) -> Result:
+    """The point of keeping notes is that the next run reads them."""
+    denied = re.search(r"nothing (from|related to) previous sessions|"
+                       r"no prior work|nothing to carry over", t.steps[0].visible, re.I)
+    return Result("noticed the earlier work", not denied,
+                  "claimed there was no prior work in a project it had already planned in"
+                  if denied else "")
+
+
+def check_hard_violation_raised(t: "Transcript", _) -> Result:
+    """A style review that never blocks anything is decoration."""
+    found = re.search(r"(hard|blocking) violation|must be fixed|"
+                      r"exceeds .{0,40}(line|limit)|too (long|large)|"
+                      r"split (it|this|the function)|over 40 lines",
+                      t.full, re.I)
+    return Result("raised a blocking style violation", bool(found),
+                  "" if found else "reviewed a deliberately oversized design and found nothing")
+
+
+def check_partial_use_verdict(t: "Transcript", _) -> Result:
+    """The middle verdict — existing code does most of it — is the hardest one.
+
+    "Use it" and "write it from scratch" are easy. Saying that normalise_date
+    covers most of the job and naming the remainder is where a synthesis earns
+    its keep, and it is what raises the near-duplicate signal.
+    """
+    verdict = re.search(r"partial|most of|covers .{0,30}(but|except)|"
+                        r"extend|build on|reuse .{0,40}and add", t.full, re.I)
+    return Result("reached a partial-use verdict", bool(verdict),
+                  "" if verdict else "no middle verdict — it either adopted or ignored the existing code")
+
+
+def check_multi_session(t: "Transcript", _) -> Result:
+    split = re.search(r"more than one session|multi[- ]session|too (big|large) for one|"
+                      r"split .{0,40}(into|across)|sub-?tasks?", t.visible, re.I)
+    return Result("judged the work too big for one session", bool(split),
+                  "" if split else "treated a deliberately oversized request as one sitting")
+
+
+def check_future_tasks_written(t: "Transcript", _) -> Result:
+    have = [k for k in t.files if k.endswith("future-tasks.md")]
+    return Result("recorded the deferred work", bool(have),
+                  ", ".join(have) if have else "no future-tasks.md")
+
+
+def check_dependency_evidence(t: "Transcript", _) -> Result:
+    """Proposing a new dependency requires evidence, and honesty about CVEs.
+
+    This is the only agent that ingests untrusted web content, and the rule is
+    that an unverified security status is never reported as clean.
+    """
+    if "package-searcher" not in t.full:
+        return Result("backed the dependency with evidence", False,
+                      "never searched for a package at all")
+    evidence = re.search(r"maintained|last release|downloads|stars|widely used|"
+                         r"actively|popular|adoption", t.full, re.I)
+    false_clean = re.search(r"no known (cve|vulnerabilit)|no vulnerabilities|"
+                            r"(cve|security)[^.]{0,30}clean", t.full, re.I)
+    if false_clean:
+        return Result("backed the dependency with evidence", False,
+                      "claimed a clean security status it cannot verify")
+    return Result("backed the dependency with evidence", bool(evidence),
+                  "" if evidence else "proposed a package with no adoption evidence")
+
+
 # ── cases ─────────────────────────────────────────────────────────────────────
 
 CASES = [
@@ -635,6 +845,210 @@ CASES = [
             check_stopped_for_input,
         ],
     ),
+    # ── the durable output, and the stateful flows ────────────────────────────
+    Case(
+        name="artefacts",
+        description="A finished run must leave the notes it promises, with the "
+                    "plan's own headings written for a human.",
+        prompt="/spyglass:spyglass add a function that formats a currency amount",
+        turns=[
+            "Yes, that name and size are fine. Take a float and a three-letter "
+            "currency code, return a string like '1,234.50 EUR'.",
+            "The plan looks right. Continue.",
+            "Continue.",
+            "Yes, write those notes.",
+        ],
+        checks=[
+            check_no_jargon,
+            check_artefact_set,
+            check_plan_headings,
+            check_no_implementation,
+        ],
+    ),
+    Case(
+        name="complete-flow",
+        description="Completing a feature must draft, ask, and only then write.",
+        setup=[
+            "/spyglass:spyglass add a function that formats a currency amount",
+            "Yes, that name and size are fine. Take a float and a three-letter "
+            "currency code, return a string like '1,234.50 EUR'.",
+            "The plan looks right. Continue.",
+            "Continue.",
+            "Yes, write those notes.",
+        ],
+        wants_slug=True,
+        prompt="/spyglass:spyglass --complete {slug}",
+        turns=["Yes, that summary is right. Write it."],
+        checks=[
+            check_no_jargon,
+            check_summary_written_after_confirming,
+            check_marked_complete,
+            check_no_implementation,
+        ],
+    ),
+    Case(
+        name="orphan-resume",
+        description="An abandoned plan must be spotted and resumed, not "
+                    "silently regenerated.",
+        setup_fs=plant_orphan,
+        prompt="/spyglass:spyglass add a read-through cache in front of load_records",
+        turns=["Resume from the existing plan."],
+        checks=[
+            check_no_jargon,
+            check_spotted_orphan,
+            check_plan_not_regenerated,
+            check_no_implementation,
+        ],
+    ),
+    Case(
+        name="second-run",
+        description="A second piece of work in the same project must be added "
+                    "to the index, and the first must be noticed.",
+        setup=[
+            "/spyglass:spyglass add a function that formats a currency amount",
+            "Yes, that name and size are fine. Take a float and a three-letter "
+            "currency code, return a string like '1,234.50 EUR'.",
+            "The plan looks right. Continue.",
+            "Continue.",
+            "Yes, write those notes.",
+        ],
+        prompt="/spyglass:spyglass add a function that pads an id to eight digits",
+        turns=[
+            "Yes, that name and size are fine. Pad with leading zeros.",
+            "The plan looks right. Continue.",
+            "Continue.",
+            "Yes, write those notes.",
+        ],
+        checks=[
+            check_no_jargon,
+            check_referenced_prior_work,
+            check_two_features_indexed,
+            check_no_implementation,
+        ],
+    ),
+    # ── phases and signals with no coverage ───────────────────────────────────
+    Case(
+        name="style-violation",
+        description="A design that implies an oversized function must be "
+                    "blocked by the style review, not waved through.",
+        prompt="/spyglass:spyglass add a validate_record function that checks "
+               "twelve separate field rules in one function and reports every "
+               "failure it finds, with a distinct error message per rule",
+        turns=[
+            "Yes, that name works and there's no prior work. Keep it as one "
+            "function that handles all twelve rules — that's what I want.",
+            "The structure looks right. Continue.",
+            "The plan looks right. Continue.",
+            "Continue.",
+        ],
+        checks=[
+            check_no_jargon,
+            agent_ran("style-checker", "no style review ran at all"),
+            check_hard_violation_raised,
+            check_no_implementation,
+        ],
+    ),
+    Case(
+        name="partial-use",
+        description="When existing code does most but not all of the job, the "
+                    "synthesis must say so rather than pick a side.",
+        prompt="/spyglass:spyglass add a function that converts a date string to "
+               "ISO-8601 and rejects any date in the future",
+        turns=[
+            "Yes, that name and size are fine. Loose date strings in, ISO-8601 "
+            "out, and raise if the date is after today.",
+            "The plan looks right. Go ahead and check what already exists.",
+            "Continue.",
+        ],
+        checks=[
+            check_no_jargon,
+            agent_ran("investigation-synthesiser", "no synthesis of the four reports"),
+            check_partial_use_verdict,
+            check_found_existing,
+            check_no_implementation,
+        ],
+    ),
+    Case(
+        name="scope-split",
+        description="Work too large for one session must be broken up, with the "
+                    "remainder written down.",
+        prompt="/spyglass:spyglass build a full ingestion pipeline: CSV and JSON "
+               "loaders, a validation layer with per-field rules, retry and "
+               "backoff on read failures, an on-disk cache, a reporting module "
+               "with three output formats, and a command line interface",
+        turns=[
+            "Yes, that name works and there's no prior work on this.",
+            "The structure looks right. Continue.",
+            "The plan looks right. Continue.",
+            "Yes, that breakdown is right — do the first piece only.",
+            "Continue.",
+            "Yes, write those notes.",
+        ],
+        checks=[
+            check_no_jargon,
+            agent_ran("scope-assessor", "never judged the size of the work"),
+            check_multi_session,
+            check_future_tasks_written,
+            check_no_implementation,
+        ],
+    ),
+    Case(
+        name="force-refactor",
+        description="The refactor keyword must force an assessment where no "
+                    "signal would have fired.",
+        prompt="/spyglass:spyglass --refactor add a function that pads an id to eight digits",
+        turns=[
+            "Yes, that name and size are fine. Pad with leading zeros.",
+            "The plan looks right. Continue.",
+            "Continue.",
+        ],
+        checks=[
+            check_no_jargon,
+            agent_ran("refactor-assessor", "the keyword did not force an assessment"),
+            check_no_implementation,
+        ],
+    ),
+    Case(
+        name="oversized-module",
+        description="A plan that would push an existing class past its size "
+                    "limit must raise that before the code is written.",
+        prompt="/spyglass:spyglass add five new aggregations to ReportBuilder in "
+               "report.py: median, percentile, variance, moving average and "
+               "year-on-year change, each with its own formatting helper",
+        turns=[
+            "Yes, that name works and there's no prior work. Put them all on "
+            "ReportBuilder — that's where the other aggregations live.",
+            "The structure looks right. Continue.",
+            "The plan looks right. Continue.",
+            "Continue.",
+        ],
+        checks=[
+            check_no_jargon,
+            agent_ran("refactor-assessor",
+                      "the plan pushes an already-large class over the limit and "
+                      "nothing assessed it"),
+            check_no_implementation,
+        ],
+    ),
+    Case(
+        name="new-dependency",
+        description="Proposing a package the project does not have requires "
+                    "adoption evidence, and no invented security clearance.",
+        prompt="/spyglass:spyglass add a function that parses a browser "
+               "user-agent string into browser name, version and platform",
+        turns=[
+            "Yes, that name works and there's no prior work. Real-world "
+            "user-agent strings, so it needs to handle the messy ones.",
+            "The structure looks right. Continue.",
+            "The plan looks right. Go ahead and check what already exists.",
+            "Continue.",
+        ],
+        checks=[
+            check_no_jargon,
+            check_dependency_evidence,
+            check_no_implementation,
+        ],
+    ),
 ]
 
 
@@ -652,10 +1066,17 @@ class Transcript:
     particular moment. "Asked a grounded clarifying question" is true of the
     second turn or it is not true at all; searching the whole run for a question
     mark would pass on any checkpoint anywhere.
+
+    `files` is the artefact tree as it stood when the turn ended. Some guarantees
+    are about *when* something was written, not whether: the completion flow
+    must present a draft before writing it, and a resumed plan must not be
+    regenerated. Neither is visible in a final snapshot, and neither can be
+    faked by a keyword.
     """
     visible: str = ""
     full: str = ""
     turns: list["Transcript"] = field(default_factory=list)
+    files: dict[str, str] = field(default_factory=dict)
 
     @property
     def steps(self) -> list["Transcript"]:
@@ -663,9 +1084,11 @@ class Transcript:
         return self.turns or [self]
 
     def __add__(self, other: "Transcript") -> "Transcript":
-        return Transcript(self.visible + "\n" + other.visible,
-                          self.full + "\n" + other.full,
-                          self.steps + other.steps)
+        combined = Transcript(self.visible + "\n" + other.visible,
+                              self.full + "\n" + other.full,
+                              self.steps + other.steps)
+        combined.files = other.files or self.files  # latest state wins
+        return combined
 
 
 def harvest(stream: str) -> tuple[Transcript, str | None]:
@@ -781,6 +1204,38 @@ def workdir(case: Case) -> tuple[Path, Path | None]:
     return tmp, tmp
 
 
+def artefact_root(cwd: Path) -> Path:
+    """Where this run's notes live — the fixture's, or the home fallback."""
+    local = cwd / ".claude/spyglass"
+    return local if local.is_dir() else HOME_ARTEFACTS
+
+
+def feature_dirs(cwd: Path) -> list[str]:
+    root = artefact_root(cwd)
+    return sorted(p.name for p in root.iterdir() if p.is_dir()) if root.is_dir() else []
+
+
+def snapshot(cwd: Path) -> dict[str, str]:
+    """Every artefact file and its contents, keyed by path relative to the root.
+
+    Taken after each turn. Existence at the end says nothing about ordering, and
+    ordering is the whole guarantee in two of these cases: a completion summary
+    must not exist before it is confirmed, and a resumed plan must come back
+    byte-identical.
+    """
+    root = artefact_root(cwd)
+    if not root.is_dir():
+        return {}
+    out = {}
+    for f in root.rglob("*"):
+        if f.is_file():
+            try:
+                out[str(f.relative_to(root))] = f.read_text()
+            except (UnicodeDecodeError, OSError):
+                out[str(f.relative_to(root))] = "<unreadable>"
+    return out
+
+
 def run_case(case: Case, dry: bool, model: str | None) -> bool | None:
     """True passed, False failed, None never ran.
 
@@ -810,19 +1265,52 @@ def run_case(case: Case, dry: bool, model: str | None) -> bool | None:
     sync_plugin()
     reset()
     cwd, temp = workdir(case)
-    print(f"  running in {cwd} (this spawns real agents and takes a few minutes)…")
 
     try:
-        _, out = sh(base + [case.prompt], cwd=cwd)
-        transcript, session = harvest(out)
+        if case.setup:
+            print(f"  setting up prior state ({len(case.setup)} turns, not graded)…")
+            _, out0 = sh(base + [case.setup[0]], cwd=cwd)
+            pre, s0 = harvest(out0)
+            for turn in case.setup[1:]:
+                if not s0:
+                    break
+                _, o = sh(base + ["--resume", s0, turn], cwd=cwd)
+                more, s1 = harvest(o)
+                s0 = s1 or s0
+                pre = pre + more
+            why = aborted(pre)
+            if why:
+                print(f"  ABORTED during setup — {why}.")
+                return None
+            (REPO / "tests/.transcripts").mkdir(exist_ok=True)
+            (REPO / f"tests/.transcripts/{case.name}.setup.txt").write_text(pre.full)
 
-        for i, turn in enumerate(case.turns, 1):
+        if case.setup_fs:
+            case.setup_fs(cwd)
+
+        prompt, turns = case.prompt, list(case.turns)
+        if case.wants_slug:
+            found = feature_dirs(cwd)
+            if not found:
+                print("  ! setup left no feature folder; cannot resolve {slug}")
+                return None
+            prompt = prompt.replace("{slug}", found[0])
+            turns = [t.replace("{slug}", found[0]) for t in turns]
+            print(f"  resolved slug: {found[0]}")
+
+        print(f"  running in {cwd} (this spawns real agents and takes a few minutes)…")
+        _, out = sh(base + [prompt], cwd=cwd)
+        transcript, session = harvest(out)
+        transcript.files = snapshot(cwd)
+
+        for i, turn in enumerate(turns, 1):
             if not session:
                 print("  ! no session id returned; cannot continue the conversation")
                 return None
-            print(f"  answering checkpoint {i}/{len(case.turns)}…")
+            print(f"  answering checkpoint {i}/{len(turns)}…")
             _, out_n = sh(base + ["--resume", session, turn], cwd=cwd)
             more, s = harvest(out_n)
+            more.files = snapshot(cwd)
             session = s or session
             transcript = transcript + more
 

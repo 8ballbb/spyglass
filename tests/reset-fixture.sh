@@ -85,6 +85,19 @@ grep -q 'python-dateutil' "$FIXTURE/pyproject.toml" \
     && check "P4  python-dateutil declared" ok \
     || check "P4  python-dateutil declared" no
 
+size=$(python3 - "$FIXTURE" <<'PYSIZE'
+import ast, sys, pathlib
+src = pathlib.Path(sys.argv[1], "src/dataflow/report.py").read_text()
+cls = next(n for n in ast.parse(src).body
+           if isinstance(n, ast.ClassDef) and n.name == "ReportBuilder")
+print(cls.end_lineno - cls.lineno + 1)
+PYSIZE
+)
+# Just under the 200-line limit: a plan that adds to it should tip it over.
+{ [ "$size" -gt 150 ] && [ "$size" -lt 200 ]; } \
+    && check "P5  ReportBuilder near limit ($size lines)" ok \
+    || check "P5  ReportBuilder near limit ($size, need 150-199)" no
+
 echo
 if [ "$fail" -eq 0 ]; then
     echo "Fixture is clean. Run the test from:"
