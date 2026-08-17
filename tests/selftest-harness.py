@@ -434,8 +434,17 @@ expect("adoption evidence passes", h.check_dependency_evidence(evidenced, None).
 lying, _ = h.harvest(stream(
     tool("Agent", subagent_type="spyglass:package-searcher", prompt="find one"),
     text("ua-parser is well maintained and has no known CVEs.")))
-expect("an unverifiable clean bill fails",
+expect("a clean bill with no advisory fetch fails",
        h.check_dependency_evidence(lying, None).ok, False)
+
+# And the fix for it must pass: clean is legitimate once the page was fetched.
+verified, _ = h.harvest(stream(
+    tool("Agent", subagent_type="spyglass:package-searcher", prompt="find one"),
+    tool("WebFetch", url="https://osv.dev/list?ecosystem=PyPI&q=ua-parser"),
+    text("ua-parser: actively maintained, 24M downloads/month. cve_status clean "
+         "— fetched the OSV list, page returned No results.")))
+expect("a clean bill backed by the fetch passes",
+       h.check_dependency_evidence(verified, None).ok, True)
 bare, _ = h.harvest(stream(
     tool("Agent", subagent_type="spyglass:package-searcher", prompt="find one"),
     text("Use ua-parser.")))
