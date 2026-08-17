@@ -1014,7 +1014,12 @@ CASES = [
                "backoff on read failures, an on-disk cache, a reporting module "
                "with three output formats, and a command line interface",
         turns=[
-            "Yes, that name works and there's no prior work on this.",
+            # Generic affirmations are not answers. Both of the runs that failed
+            # here held out on a design-deciding question the scripted replies
+            # ignored — correctly, since guessing is the failure the checkpoint
+            # exists to prevent. Anticipate it instead.
+            "Yes, that name works and there's no prior work. Build it as new "
+            "modules alongside ingest.py — leave load_records untouched.",
             "The structure looks right. Continue.",
             "The plan looks right. Continue.",
             "Yes, that breakdown is right — do the first piece only.",
@@ -1054,7 +1059,10 @@ CASES = [
                "year-on-year change, each with its own formatting helper",
         turns=[
             "Yes, that name works and there's no prior work. Put them all on "
-            "ReportBuilder — that's where the other aggregations live.",
+            "ReportBuilder — that's where the other aggregations live. "
+            "year_on_year_change takes two pre-aggregated numbers (current, "
+            "previous); percentile takes the percentile as an argument; moving "
+            "average takes a window size. No date handling anywhere.",
             "The structure looks right. Continue.",
             "The plan looks right. Continue.",
             "Continue.",
