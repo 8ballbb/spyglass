@@ -1,7 +1,7 @@
 # Spyglass test fixtures
 
 `sample-project/` is a small synthetic Python project used to exercise the
-Spyglass agents. It contains four deliberately planted conditions. **Do not
+Spyglass agents. It contains five deliberately planted conditions. **Do not
 "fix" any of them** — each one is the target signal for a specific agent's
 tests, and removing it will break those tests.
 
@@ -40,6 +40,17 @@ pytest configuration (`[tool.pytest.ini_options]` with `testpaths`). This
 gives `deps-searcher` and `test-planner` real configuration to read and
 report on rather than an empty project.
 
+### P5 — a class just under the size limit (`report.ReportBuilder`)
+
+`src/dataflow/report.py` defines `ReportBuilder` at 192 lines — deliberately
+just under the 200-line limit the design process enforces. A plan that adds
+several more aggregations to it should notice it would push the class past that
+limit and raise **S3** before any code is written.
+
+Its methods are individually trivial (cognitive complexity 0–2), which is the
+point: this is a *size* problem, not a *complexity* problem, and the two signals
+must not be confused. Do not split the class or trim its methods.
+
 ## Warning
 
 These conditions are the fixture's entire purpose. Refactoring
@@ -56,7 +67,7 @@ run **resumes from them** rather than starting fresh — correct behaviour, and
 exactly wrong for testing. The script clears artefacts from all three locations
 a run can write to (the fixture, the repo root, and `~/.claude/spyglass` from a
 no-project run), restores the fixture sources in case a run edited them, and
-verifies all four planted conditions are still intact.
+verifies all five planted conditions are still intact.
 
 It exits non-zero if a plant has gone missing, so a fixture that can no longer
 exercise every check fails loudly instead of passing a weakened test.
@@ -111,6 +122,39 @@ asked for.
 | `holds-out` | Fed non-answers to a question that decides the design, it keeps asking rather than guessing | — |
 | `ambiguous` | An open-ended request is clarified before anything is designed, and "use what exists" is on the menu | P1 |
 | `no-project` | Outside a Python project, notes go to `~/.claude/spyglass` and it says so | — |
+
+The second set covers what the first left untested — the durable output, the
+stateful flows, and the phases and signals no earlier case reached.
+
+| Case | Proves | Plant |
+|---|---|---|
+| `artefacts` | A finished run leaves every file it promises, with the plan's own headings written for a human | — |
+| `complete-flow` | Completing a feature drafts, asks, and only then writes | — |
+| `orphan-resume` | An abandoned plan is spotted and resumed, not silently regenerated | — |
+| `second-run` | A second piece of work is added to the index, and the first is noticed | — |
+| `style-violation` | A design implying an oversized function is blocked, not waved through | — |
+| `partial-use` | Existing code doing most of the job produces a middle verdict, not a side | P1 |
+| `scope-split` | Work too large for one session is broken up, with the remainder written down | — |
+| `force-refactor` | The refactor keyword forces an assessment where no signal would fire | — |
+| `oversized-module` | A plan pushing a class past its size limit raises that before code is written | P5 |
+| `new-dependency` | A proposed package carries adoption evidence and no invented security clearance | — |
+
+Three of these assert *ordering* rather than existence, which is why the harness
+snapshots the artefact tree after every turn:
+
+- `complete-flow` — a summary written before it was confirmed looks identical,
+  at the end, to one written after
+- `orphan-resume` — a regenerated plan looks like a successful resume while
+  discarding the work being resumed
+- `new-dependency` — a clean CVE status is only meaningful if the advisory page
+  was actually fetched during the run
+
+`new-dependency` produced the most serious finding in the suite's history. The
+package searcher reported *"clean — OSV list query for `ua-parser` on PyPI
+returned no advisories"* having fetched only the PyPI project page and the
+download statistics. The advisory page was never requested. That is not a
+misjudgement but an invented result, and it reads exactly like a check that
+passed.
 
 Four of these — `dont-write-it`, `already-done`, `ambiguous`, `holds-out` — test
 the same thing from different angles: **not building something**. That is
