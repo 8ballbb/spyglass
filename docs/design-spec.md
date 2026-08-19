@@ -50,6 +50,7 @@ Every one of these exists because a stranger will install this into a repository
 | No hard dependency on other plugins | Phase 12's handoff to `superpowers:writing-plans` is offered only if superpowers is installed |
 | No hard dependency on external tools | radon improves Phase 8 but is never required and never prompted for |
 | Must work outside a project | Phase 1 has a defined no-project fallback |
+| No hard dependency on external tools | complexipy and radon each improve Phase 8, neither is required, and neither is ever prompted for |
 | Agent names are already namespaced | Agents are `pattern-analyzer`, not `python-pattern-analyzer` — the plugin prefix is automatic |
 
 ### Cost expectations
@@ -367,7 +368,7 @@ Refactor assessment is not something the user has to ask for. The skill watches 
 
 | Signal | Source | Fires when |
 |---|---|---|
-| **S1 — Complexity in the change path** | Phase 8 | A function being modified has radon grade C or worse (cyclomatic complexity > 10) |
+| **S1 — Complexity in the change path** | Phase 8 | A function being modified exceeds the threshold of whichever tool measured it: cognitive complexity > 15 (complexipy), or grade C / cyclomatic > 10 (radon) |
 | **S2 — Near-duplicate existing code** | Phase 6 | The synthesiser recommends `partial-use` against **priority-1 codebase code** — existing code does most of the job, so unifying may beat building alongside it |
 | **S3 — Plan pushes existing code over a limit** | Phase 4b + Phase 7 | The plan would take an existing class past 200 lines, or give a module a second distinct responsibility |
 | **S4 — Inconsistent patterns in the target area** | Phase 3 | The pattern analyser reports `inconsistent` for any pattern in the directories being touched — new code cannot follow a convention that does not exist |
