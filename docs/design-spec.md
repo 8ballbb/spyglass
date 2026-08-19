@@ -712,6 +712,8 @@ Not user-initiated in normal use — the skill decides refactoring is worth asse
 
 **Input:** fired signals with evidence, `pseudocode.md`, complexity report (if run), pattern report (if run).
 
+Where complexipy performed the measurement, the complexity report also carries its `--suggest-refactors` output: line ranges, named rules, and estimated complexity reductions. This phase previously derived all of that by reading the code and estimating — the kind of judgement that reads as authoritative and cannot be checked. The plans are evidence, not conclusions; the analyser has no idea what the change is for.
+
 **Scope cap:** maximum 5 recommendations, restricted to files the task already touches. If more candidates exist, report the count dropped rather than silently truncating.
 
 **Output per recommendation:** file and function; motivating signal; the problem; specific approach (extract function, split class, generalise existing function to absorb the new case, unify duplicates, flatten nesting); `order` (`before-current-task` | `after-current-task`); `risk` (`low` internal only | `medium` changes signatures | `high` changes public API or module boundary).
