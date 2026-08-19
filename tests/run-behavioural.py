@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -84,9 +85,24 @@ class Case:
     wants_slug: bool = False
 
 
+# Optional complexity tools, installed by tests/install-tools.sh into a venv the
+# harness puts on PATH for the runs it spawns. The plugin never installs
+# anything — but without these, every complexity assertion here exercises the
+# by-eye fallback and the measured path never runs at all.
+TOOLS_VENV = REPO / "tests/.tools-venv/bin"
+
+
+def env_with_tools() -> dict[str, str]:
+    env = dict(os.environ)
+    if TOOLS_VENV.is_dir():
+        env["PATH"] = f"{TOOLS_VENV}{os.pathsep}{env.get('PATH', '')}"
+    return env
+
+
 def sh(cmd: list[str], cwd: Path | None = None, timeout: int = 900) -> tuple[int, str]:
     p = subprocess.run(
-        cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout
+        cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout,
+        env=env_with_tools(),
     )
     return p.returncode, (p.stdout or "") + (p.stderr or "")
 
