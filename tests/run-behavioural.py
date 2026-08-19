@@ -1030,6 +1030,8 @@ CASES = [
             "The plan looks right. Continue.",
             "Yes, that breakdown is right — do the first piece only.",
             "Continue.",
+            "Yes, that's right. Continue.",
+            "Yes, that all looks right. Continue.",
             "Yes, write those notes.",
         ],
         checks=[
