@@ -426,6 +426,21 @@ def check_said_no_project(t: "Transcript", _) -> Result:
                   "" if said else "used the fallback silently — the user has no idea where they are")
 
 
+# Generic answers for the back half of a standard-flow run. Four cases in a row
+# were graded as failures for stopping before the phase they existed to test —
+# the standard flow has more gates than the phase list suggests, because style
+# review, complexity, refactoring and test planning each add one conditionally.
+# Over-supplying turns costs a few cheap replies; under-supplying invalidates
+# the whole run.
+CARRY_ON = [
+    "Continue.",
+    "Yes, that's right. Continue.",
+    "Yes, that all looks right. Continue.",
+    "Continue.",
+    "Yes, write those notes.",
+]
+
+
 # ── graders for the durable output ────────────────────────────────────────────
 #
 # Everything above grades the conversation. These grade what is left on disk
@@ -1089,7 +1104,7 @@ CASES = [
             "average takes a window size. No date handling anywhere.",
             "The structure looks right. Continue.",
             "The plan looks right. Continue.",
-            "Continue.",
+            *CARRY_ON,
         ],
         checks=[
             check_no_jargon,
