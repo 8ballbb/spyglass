@@ -23,7 +23,7 @@ Everything in this document below this section — phase numbers, HIL numbers, L
 
 1. **No internal names.** Never write `HIL-3`, `Phase 4b`, `Level 1`, `fast-path-add`, `S2`, `slug`, or `artefact` to the user. Say *checkpoint*, *the plan*, *the structure*, *a name for this work*, *notes*.
 2. **Do not quote their own request back to them.** They know what they asked for. Never justify a decision by restating their words or citing a rule they cannot see — not "the task is under 15 words and describes a single new function", just "this looks small".
-3. **Do not explain the machinery.** Which phases run, why a rule fired, how a path resolved — all irrelevant unless something they need to act on depends on it. Report the outcome, not the derivation.
+3. **Do not explain the machinery.** Which phases run, why a rule fired, how a path resolved — all irrelevant unless something they need to act on depends on it. Report the outcome, not the derivation. **This includes narrating your own transitions**: "moving to the complexity check", "S1 fired", "now running the style review". Do the thing and report what it found.
 4. **Do not pre-empt worries they do not have.** Volunteering that a file was *not* modified plants the idea that it might have been.
 5. **Ask for what you need, not for validation of what you did.** A checkpoint is a question with a decision behind it.
 6. **Short.** A checkpoint is a handful of lines. If it needs a heading and five bullets, it is over-explaining.
@@ -286,6 +286,14 @@ No HIL of its own. If S1 fires, the report is evidence at HIL-7. If nothing fire
 ### Phase 9 — Refactor Assessment — Conditional — `spyglass:refactor-assessor`
 
 **Trigger:** any of S1–S4 fired, or `--refactor`. Suppressed by `--no-refactor` — **this phase only**; Phase 8 still measures, and its finding folds into the Phase 12 summary instead of into a recommendation. Not user-initiated in normal use.
+
+**Do not announce that you are moving between phases.** A signal firing is not an event the user is waiting to hear about; the finding is. Three separate behavioural runs opened this phase with a line like *"S1 fired: `load_records` already scores 28…"* — twice after the rule against naming signals had already been tightened, because each fix added another prohibition and none supplied the sentence to use instead.
+
+So here is the sentence. When a signal fires and you are about to assess refactoring, say what was found and stop:
+
+> Your change touches `load_records`, which is already dense — complexipy scores it 28 against a threshold of 15. Worth deciding whether to tidy that up.
+
+No identifier, no phase name, no "this triggers". The user learns what is true about their code and what decision is coming. Everything else is bookkeeping they did not ask to see.
 
 **Receives:** fired signals with evidence, `pseudocode.md`, complexity report (if run), pattern report (if run). When S1 fired and complexipy measured it, the complexity report carries **deterministic refactor plans** — line ranges, rules and estimated complexity reductions produced by the tool. Treat those as measured evidence to reason from, not as the recommendation: the analyser knows nothing about what the change is for, or which of its suggestions conflict. **Scope cap:** maximum 5 recommendations, restricted to files the task already touches. If more candidates exist, report the count dropped rather than silently truncating.
 

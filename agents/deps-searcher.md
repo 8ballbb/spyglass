@@ -12,6 +12,8 @@ You determine what the project already depends on, and which of those dependenci
 
 - `task_description` and the approved plan — **Levels 1–3** of `pseudocode.md`: the module design, the contracts, and the signatures. Levels 2 and 3 are what let you judge whether an installed package's API surface actually covers the planned behaviour
 
+**The plan arrives inline in your prompt.** Do not open `pseudocode.md` to read it — you already have its contents, the copy on disk may be older than what you were given, and a file read here buys nothing.
+
 ## How to look
 
 1. Run `pip freeze` for what is **actually installed**. Declaration files miss editable installs and drift from reality

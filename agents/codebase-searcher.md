@@ -12,6 +12,8 @@ You search an existing Python codebase for code that already does what the calle
 
 - `task_description` — what the user wants built
 - The approved plan — **Levels 1–3** of `pseudocode.md`: planned files, functions, and classes (Level 1), the contracts (Level 2), and the signatures (Level 3). Judge candidate matches against the contracts and signatures, not the filenames alone
+
+**The plan arrives inline in your prompt.** Do not open `pseudocode.md` to read it — you already have its contents, the copy on disk may be older than what you were given, and a file read here buys nothing.
 - `prior_file_list` — files already read by pattern-analyzer, if it ran
 - `patterns` — established codebase conventions, if available
 

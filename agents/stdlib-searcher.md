@@ -19,6 +19,8 @@ You work from knowledge alone. **Do not use any tool.** You do not read files, r
 
 - `task_description` and the approved plan — **Levels 1–3** of `pseudocode.md`: the module design, the contracts, and the signatures. Levels 2 and 3 tell you what the planned code must actually do, which is what a stdlib symbol has to match
 
+**The plan arrives inline in your prompt.** The reference to `pseudocode.md` above names where it came from, not somewhere for you to go. You have already been given its contents, and reading a file would break the rule above.
+
 ## Modules to consider first
 
 `itertools`, `functools`, `collections`, `pathlib`, `contextlib`, `dataclasses`, `typing`, `abc`, `enum`, `datetime`, `io`, `os`, `re`, `json`, `csv`, `logging`, `threading`, `concurrent.futures`, `unittest.mock`
