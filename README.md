@@ -55,7 +55,7 @@ Refactor assessment is **signal-driven by default** — Spyglass watches for fou
 Phase 1  — Context check                          Locate artefacts, detect orphaned state, generate slug
 Phase 2a — Lightweight scope check                 └─ HIL-1: name + prior work + size
                                                     └─ HIL-1b (conditional): clarify an ambiguous request
-Phase 4a — Module design (Level 1)
+Phase 4a — Module design
 Phase 3  — Pattern analysis (conditional)          └─ HIL-2: module structure + conventions found
 Phase 4b — Contract + signature design              └─ HIL-3: approve the full plan
 Phase 2b — Scope re-check                           └─ HIL-4: confirm scope + sub-task breakdown
@@ -88,6 +88,8 @@ Even on the fast path, Spyglass still checks what your project already depends o
 
 Every design artefact — pseudo-code plans, session context, test plans, index files — is written to `.claude/spyglass/` inside your project. On first run, Spyglass writes `.claude/spyglass/.gitignore` containing a single line, `*`, which makes that entire directory invisible to git.
 
+If you run Spyglass somewhere with no Python project above it — no `pyproject.toml`, `setup.py`, `setup.cfg` or `requirements.txt` — the artefacts go to `~/.claude/spyglass/` instead, and it says so at the first checkpoint. Inside a project, the *nearest* marker wins: a package nested in a monorepo gets its own artefact folder rather than the repository root's.
+
 **Your project's root `.gitignore` is never read, created, or modified.** This is deliberate: that file is tracked, shared, and often governed by team policy, and a plugin that silently edits it produces an unexpected diff in your next commit. Spyglass leaves it alone, always. If you'd rather have the artefacts tracked, delete `.claude/spyglass/.gitignore` — Spyglass will not recreate it.
 
 ## Known issues
@@ -99,9 +101,13 @@ everything else known-but-unverified.
 
 ## Requirements
 
-- A Python project.
+- A Python project. (It runs outside one too — artefacts fall back to `~/.claude/spyglass/` — but the reuse investigation has much less to work with.)
 - [`complexipy`](https://pypi.org/project/complexipy/) and [`radon`](https://pypi.org/project/radon/) are both optional. Either improves the accuracy of complexity assessment — complexipy is preferred, because cognitive complexity charges for nesting and cyclomatic complexity does not. If neither is installed, Spyglass proceeds without them and never prompts you to install anything; your environment is not this plugin's business.
 - No dependency on any other plugin. Every phase runs standalone; if `superpowers` happens to be installed, Spyglass offers an additional handoff option at the end, but nothing about the design flow requires it.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## Licence
 

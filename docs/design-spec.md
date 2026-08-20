@@ -97,14 +97,21 @@ spyglass/
 │   └── test-planner.md
 ├── docs/
 │   ├── design-spec.md           # this file
-│   └── implementation-plan.md
+│   ├── implementation-plan.md   # historical record of the build; not a source of truth
+│   └── verification-backlog.md  # fixed but unobserved, and known gaps, by priority
 ├── tests/
 │   ├── validate-agents.py       # frontmatter + reference validator, stdlib only
+│   ├── selftest-harness.py      # grades the graders, free and instant
+│   ├── run-behavioural.py       # drives the plugin headlessly and grades real runs
+│   ├── reset-fixture.sh         # pristine fixture + verifies the planted conditions
+│   ├── sync-plugin.sh           # working tree -> installed cache, so runs test this code
+│   ├── install-tools.sh         # complexipy + radon into a venv the harness puts on PATH
 │   └── fixtures/
 │       ├── README.md
 │       └── sample-project/      # planted conditions for agent verification
 ├── assets/
 │   └── spyglass.png             # project image, referenced by README
+├── CHANGELOG.md                 # what changed between released versions
 ├── .gitignore                   # standard Python/macOS ignores
 ├── README.md
 └── LICENSE                      # MIT
@@ -187,11 +194,7 @@ Agents are referenced as `spyglass:<agent-name>`.
 
 ### Repository setup
 
-Implementation includes standing up the repository itself, not only the plugin files.
-
-**Location:** `~/Desktop/projects/spyglass/` — alongside the user's other projects.
-
-**Spec home:** once the repo exists, this design spec moves into it at `docs/design-spec.md`. It currently lives at `~/.claude/docs/superpowers/specs/` only because this session ran outside any project, and that path is not a git repository — so the spec cannot be version-controlled where it sits.
+Standing up the repository was part of the build, not only the plugin files. Done: the repo lives at `~/Desktop/projects/spyglass/`, published at `github.com/8ballbb/spyglass`, and this spec moved into it at `docs/design-spec.md`.
 
 **Additional files beyond the plugin tree:**
 
@@ -214,7 +217,7 @@ spyglass/
 6. Usage — the five invocation forms
 7. What a run looks like — the phase flow, condensed, with the HIL checkpoints visible so users know it is interactive
 8. Where artefacts go — `.claude/spyglass/`, and the note that the root `.gitignore` is never touched
-9. Requirements — Python project; radon optional and never required
+9. Requirements — Python project; complexipy and radon each optional, neither ever required
 10. Licence
 
 **Git setup:** initialise the repo, commit the plugin tree as the first commit, and confirm before any push to a remote. Publishing is the user's call, not an implementation step taken unasked.

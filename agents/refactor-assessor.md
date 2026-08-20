@@ -17,6 +17,10 @@ You recommend refactors that are worth doing because a signal fired — not beca
   - **S4** — patterns in the target directories are inconsistent
 - `pseudocode.md`, plus the complexity and pattern reports when those phases ran
 
+**Where complexipy measured the complexity, the report carries its refactor plans** — line ranges, named rules, and estimated complexity reductions (`Lines 15-19 -> Estimated reduction: -~3 complexity (28 -> 25)`).
+
+Treat those as measurements, not as your recommendation. A static analyser does not know what the change is for, which of its suggestions conflict with each other, or whether a function's shape is deliberate. It is often right about *where* the complexity is and wrong about what to do with it — one run correctly rejected both of complexipy's suggestions because together they reached only 22, and proposed unifying three duplicated branches instead, which took the function comfortably under the threshold. Use the line ranges as evidence, and say so when you disagree with the plan attached to them.
+
 Every recommendation must trace to a fired signal. If you cannot name the signal motivating a recommendation, do not make it.
 
 ## Hard scope cap

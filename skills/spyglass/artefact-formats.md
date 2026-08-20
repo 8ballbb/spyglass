@@ -67,6 +67,22 @@ Optional files appear as `not-run` when skipped:
 | completed-summary.md | — | pending |
 ```
 
+## `<feature>/pseudocode.md`
+
+The design itself, and the only artefact a human reads closely. Use exactly these headings:
+
+```markdown
+# <feature-slug>
+
+## Module design
+## Contracts
+## Signatures
+```
+
+**Never `Level 1`, `Level 2` or `Level 3`.** Those name the stages of *writing* the plan, not sections of it. The distinction is not pedantic: this file is shown back at checkpoints, so a heading inside it becomes a heading on the user's screen, and a run once presented `## Level 1 — Module design` to someone who had never heard the term. The format was unspecified, so the model borrowed the stage names it had been given.
+
+Where a refactor is adopted with `order: before-current-task`, it goes in a **Preliminary refactors** section at the top, above *Module design* — implementation performs those first, so new code lands on sound structure.
+
 ## Single-session success path
 
 Write `session-context.md`; set `PLANS_INDEX.md` to `session-done`. `future-tasks.md` only if deferred refactors exist. `INDEX.md` marks present files `current` and absent optional files `not-run`. Status becomes `complete` only via `--complete`.
@@ -110,7 +126,8 @@ current_sub_task       string    What we are implementing this session
 prior_plans            list      Relevant artefacts confirmed at HIL-1
 library_recommendation object    Phase 6 synthesis (approved at HIL-5)
 style_violations       list      Phase 7 findings (resolved at HIL-6)
-complexity_report      object    Phase 8 findings (if run)
+complexity_report      object    Phase 8 findings (if run) — includes the tool used
+                                 and, where complexipy ran, its refactor plans
 refactor_signals       list      Fired signals — each {id, source_phase, evidence}
 adopted_refactors      list      Selected at HIL-7 — each {recommendation, order, risk}
 user_overrides         list      Entries of {hil, recommended, chosen, reason}
