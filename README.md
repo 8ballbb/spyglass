@@ -90,6 +90,13 @@ Every design artefact — pseudo-code plans, session context, test plans, index 
 
 **Your project's root `.gitignore` is never read, created, or modified.** This is deliberate: that file is tracked, shared, and often governed by team policy, and a plugin that silently edits it produces an unexpected diff in your next commit. Spyglass leaves it alone, always. If you'd rather have the artefacts tracked, delete `.claude/spyglass/.gitignore` — Spyglass will not recreate it.
 
+## Known issues
+
+Spyglass sometimes reports an internal identifier — a message beginning `S1
+fired` rather than describing what it found. Cosmetic, and being fixed; see
+[`docs/verification-backlog.md`](docs/verification-backlog.md) for that and
+everything else known-but-unverified.
+
 ## Requirements
 
 - A Python project.
