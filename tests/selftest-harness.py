@@ -343,6 +343,13 @@ expect("internal stage names fail", h.check_plan_headings(with_files(staged), No
 partial = dict(FULL, **{"pad-id/pseudocode.md": "# pad-id\n\n## Module design\nx"})
 expect("missing sections fail", h.check_plan_headings(with_files(partial), None).ok, False)
 
+print("\ncheck_test_plan_written")
+expect("a written test plan passes",
+       h.check_test_plan_written(with_files({"pad-id/test-plan.md": "cases"}), None).ok, True)
+# Dispatching the planner proves the phase ran and nothing about what it left.
+expect("no test-plan.md fails",
+       h.check_test_plan_written(with_files(FULL), None).ok, False)
+
 print("\ncheck_summary_written_after_confirming — ordering, not existence")
 before = with_files({})
 after = with_files({"pad-id/completed-summary.md": "done"})

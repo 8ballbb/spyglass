@@ -1,8 +1,8 @@
 # Spyglass — Plugin Design Spec
 
-**Date:** 2026-08-12
-**Status:** Draft — pending user review
-**Revision:** 7 (named; packaged as a distributable plugin)
+**Date:** 2026-08-12, revised through 2026-08-20
+**Status:** Built, published, and behaviourally tested. This document and the code govern; where they disagree, the code is what runs.
+**Revision:** 8 (behavioural findings folded in; complexipy added alongside radon)
 
 ---
 

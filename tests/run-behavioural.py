@@ -489,6 +489,19 @@ def check_plan_headings(t: "Transcript", _) -> Result:
                   "missing headings: " + ", ".join(wanted) if wanted else "")
 
 
+def check_test_plan_written(t: "Transcript", _) -> Result:
+    """The test phase has an artefact, and nothing was checking for it.
+
+    force-tests asserted the planner was dispatched, which proves the phase ran
+    and nothing about what it left behind. An agent that reports test cases into
+    the conversation and writes no file has produced nothing anyone can use
+    later, which is the whole point of the artefacts.
+    """
+    have = [k for k in t.files if k.split("/")[-1] == "test-plan.md"]
+    return Result("wrote the test plan", bool(have),
+                  ", ".join(have) if have else "test planning ran but left no test-plan.md")
+
+
 def check_summary_written_after_confirming(t: "Transcript", _) -> Result:
     """Confirmation precedes the write — a property no final snapshot can show.
 
@@ -792,11 +805,12 @@ CASES = [
             "Yes, that name and size are fine. Take a float and a three-letter "
             "currency code, return a string like '1,234.50 EUR'.",
             "The plan looks right. Continue.",
-            "Continue.",
+            *CARRY_ON,
         ],
         checks=[
             check_no_jargon,
             agent_ran("test-planner", "the keyword did not force test planning"),
+            check_test_plan_written,
             check_no_implementation,
         ],
     ),

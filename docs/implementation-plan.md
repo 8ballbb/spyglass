@@ -2,11 +2,11 @@
 
 > **Status note:** This is the original implementation plan, retained in the repo as a record of how the build was structured and sequenced. The build is complete. Where this document diverges from what actually shipped, `docs/design-spec.md` and the code govern — this file is history, not a source of truth.
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Do not execute this plan.** It was written to be followed once, and it was. The checkboxes and sub-skill instructions below are preserved as part of the record; acting on them would rebuild something that already exists and overwrite work done since.
 
 **Goal:** Build and locally verify `spyglass`, a distributable Claude Code plugin whose skill runs a 12-phase design analysis over a Python task before any code is written.
 
-**Architecture:** A plugin directory containing one skill (`SKILL.md` + `python-standards.md`), eleven agent definitions, a command wrapper, and two JSON manifests. The skill orchestrates; the agents do bounded single-purpose work and report back. Everything is markdown and JSON — there is no runtime code.
+**Architecture:** A plugin directory containing one skill (`SKILL.md` + `python-standards.md`), eleven agent definitions, and two JSON manifests. (The command wrapper described later in this document was deliberately dropped during the build — see the spec's *Invocation* section for why.) The skill orchestrates; the agents do bounded single-purpose work and report back. Everything is markdown and JSON — there is no runtime code.
 
 **Tech Stack:** Markdown with YAML frontmatter, JSON manifests, git. Python 3 only for validating JSON and as the fixture project's language. `radon` optionally for one agent, never required.
 
