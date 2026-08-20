@@ -190,6 +190,23 @@ asked a clarifying question on its own.
 
 `tests/sync-plugin.sh --check` reports drift without changing anything.
 
+### Testing the measured complexity path
+
+`tests/install-tools.sh` puts complexipy and radon in a venv under `tests/`, and
+the harness prepends it to PATH for the runs it spawns.
+
+Phase 8 measures with a tool when one is present and falls back to reading the
+code by eye when none is. Neither tool is installed on a stock machine, so every
+complexity assertion in this suite ran against the fallback until this existed —
+the measured path, which the phase is written around, had never executed.
+
+**The plugin still installs nothing.** That rule does not move: this is the test
+environment, not the plugin, and deleting `tests/.tools-venv/` undoes it
+completely. `--check` reports what a run would find.
+
+Note that installing both means runs exercise **complexipy only**, since it is
+preferred. To exercise the radon fallback, remove complexipy from the venv.
+
 ### Runs that never happened
 
 A run that dies partway — session limit, rate limit, server error — looks
