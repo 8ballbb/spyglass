@@ -48,7 +48,7 @@ Every one of these exists because a stranger will install this into a repository
 | Never dirty a user's working tree unasked | Artefacts go to `.claude/spyglass/`, self-ignored from git |
 | Never edit a user's tracked config files | The root `.gitignore` is never modified — see Git invisibility below |
 | No hard dependency on other plugins | Phase 12's handoff to `superpowers:writing-plans` is offered only if superpowers is installed |
-| No hard dependency on external tools | radon improves Phase 8 but is never required and never prompted for |
+| No hard dependency on external tools | complexipy and radon each improve Phase 8; neither is required and neither is ever prompted for |
 | Must work outside a project | Phase 1 has a defined no-project fallback |
 | No hard dependency on external tools | complexipy and radon each improve Phase 8, neither is required, and neither is ever prompted for |
 | Agent names are already namespaced | Agents are `pattern-analyzer`, not `python-pattern-analyzer` — the plugin prefix is automatic |
@@ -459,7 +459,7 @@ Wait for: both decisions. Update `pseudocode.md` after.
 **HIL-7 (batched) — Refactor findings and adoption** *(after Phases 8 and 9; conditional on a signal firing)*
 
 Present in one message:
-- **Why this ran** — which signals fired, with evidence (e.g. "S1: `parse_records` is radon grade D"; "S2: `utils.normalise_date` covers 70% of the planned `to_iso_date`")
+- **Why this ran** — the reason in the user's terms, with evidence, naming the finding and never the signal: "your change touches `parse_records`, which is already dense — radon grades it D"; "`utils.normalise_date` already covers about 70% of what this plan would build". See *Never name the signal to the user*, below
 - The complexity report, when Phase 8 ran
 - Up to 5 recommendations, each with `order` and `risk`
 
@@ -688,9 +688,9 @@ Confirms or clears **S3** using the post-HIL-6 state — a hard-violation fix ma
 
 **Trigger:** the task modifies existing Python files rather than being purely net-new.
 
-**Mechanism — measure with a tool, interpret with an agent; the agent owns both.** It has `Bash` and `Read`, so the main instance hands over file paths and nothing else — no radon output, no file contents piped through its context.
-1. The agent runs `radon cc <file> -s` for each file being modified
-2. If radon is absent, it falls back to reading the files and assessing by eye, noting the figures are estimates. Never prompt to install — environment setup is not this plugin's business
+**Mechanism — measure with a tool, interpret with an agent; the agent owns both.** It has `Bash` and `Read`, so the main instance hands over file paths and nothing else — no tool output, no file contents piped through its context.
+1. The agent runs the first installed of `complexipy --plain --max-complexity-allowed 15 <file>` or `radon cc <file> -s`, and never reconciles the two — they measure different things and averaging them produces a number that means nothing
+2. If neither is installed, it falls back to reading the files and assessing by eye, noting the figures are estimates. Never prompt to install — environment setup is not this plugin's business
 3. The main instance passes the list of file paths plus `module_design`
 4. The agent adds nesting-depth assessment and identifies functions in the change path
 

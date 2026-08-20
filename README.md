@@ -93,7 +93,7 @@ Every design artefact — pseudo-code plans, session context, test plans, index 
 ## Requirements
 
 - A Python project.
-- [`radon`](https://pypi.org/project/radon/) is optional. If it's installed, it improves the accuracy of complexity assessment; if it isn't, Spyglass proceeds without it and never prompts you to install it — your environment is not this plugin's business.
+- [`complexipy`](https://pypi.org/project/complexipy/) and [`radon`](https://pypi.org/project/radon/) are both optional. Either improves the accuracy of complexity assessment — complexipy is preferred, because cognitive complexity charges for nesting and cyclomatic complexity does not. If neither is installed, Spyglass proceeds without them and never prompts you to install anything; your environment is not this plugin's business.
 - No dependency on any other plugin. Every phase runs standalone; if `superpowers` happens to be installed, Spyglass offers an additional handoff option at the end, but nothing about the design flow requires it.
 
 ## Licence

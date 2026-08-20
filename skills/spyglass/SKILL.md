@@ -275,7 +275,7 @@ Confirms or clears **S3** using the post-HIL-6 state — a hard-violation fix ma
 
 **Receives:** the list of existing Python file **paths** the task will modify, and `module_design` so the agent knows which functions sit in the change path. Pass paths, not file contents — the agent has `Read` and fetches what it needs itself.
 
-**Always dispatch `spyglass:complexity-assessor`. This phase is the agent.** Never assess complexity yourself — not when the file is short, not when you have already read it, not when radon is missing, and not when `--no-refactor` means nothing will be proposed anyway. Reading the file to count branches yourself spends main-instance context on exactly what the delegation exists to keep out of it, and the answer arrives with no tool behind it.
+**Always dispatch `spyglass:complexity-assessor`. This phase is the agent.** Never assess complexity yourself — not when the file is short, not when you have already read it, not when no measuring tool is installed, and not when `--no-refactor` means nothing will be proposed anyway. Reading the file to count branches yourself spends main-instance context on exactly what the delegation exists to keep out of it, and the answer arrives with no tool behind it.
 
 **Measure with a tool, interpret with an agent — the agent owns both.** It has `Bash`: it runs `complexipy --plain --max-complexity-allowed 15 <file>` or `radon cc <file> -s` for each file itself, taking the first tool that is installed and never reconciling two. The main instance does not run radon and does not pipe radon output or file contents through its own context. If radon is absent, **the agent** falls back to reading the files and assessing by eye, noting that the figures are estimates and that radon would improve accuracy — **never prompt to install**, environment setup is not this plugin's business. That fallback belongs to the agent and is not an option for the main instance: "estimate it by eye" describes what happens *inside* the dispatch, never instead of it. The agent then adds what radon does not measure: nesting depth, and which functions the change actually touches.
 
@@ -330,7 +330,7 @@ Refactor assessment is not something the user has to ask for. Watch for four sig
 
 | Signal | Source | Fires when |
 |---|---|---|
-| **S1 — Complexity in the change path** | Phase 8 | A function being modified has radon grade C or worse (cyclomatic complexity > 10) |
+| **S1 — Complexity in the change path** | Phase 8 | A function being modified exceeds the threshold of whichever tool measured it — cognitive complexity above 15 (complexipy), or grade C or worse (radon, cyclomatic above 10) |
 | **S2 — Near-duplicate existing code** | Phase 6 | The synthesiser recommends `partial-use` against **priority-1 codebase code** — existing code does most of the job, so unifying may beat building alongside it |
 | **S3 — Plan pushes existing code over a limit** | Phase 4b + Phase 7 | The plan would take an existing class past 200 lines, or give a module a second distinct responsibility |
 | **S4 — Inconsistent patterns in the target area** | Phase 3 | The pattern analyser reports `inconsistent` for any pattern in the directories being touched — new code cannot follow a convention that does not exist |

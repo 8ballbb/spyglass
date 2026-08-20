@@ -11,7 +11,7 @@ You recommend refactors that are worth doing because a signal fired — not beca
 ## What you receive
 
 - The fired signals with their evidence. One or more of:
-  - **S1** — a function in the change path is radon grade C or worse
+  - **S1** — a function in the change path is over its measuring tool's threshold: cognitive complexity above 15 (complexipy) or grade C or worse (radon)
   - **S2** — existing codebase code does most of the planned job
   - **S3** — the plan pushes an existing class past 200 lines, or gives a module a second responsibility
   - **S4** — patterns in the target directories are inconsistent
