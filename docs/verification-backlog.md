@@ -51,7 +51,13 @@ than a suspected bug.
 
 **How to verify:** `--case oversized-module`, when the quota is fresh. It is the
 most expensive case in the suite — nine turns of standard flow — which is
-exactly why it keeps colliding with the limit.
+exactly why it keeps colliding with the limit. Seven attempts now; the last two
+both died at checkpoint 8 of 8, one step from being graded.
+
+**Also unverified for the same reason:** `force-tests`, whose new
+`check_test_plan_written` assertion has never run — it aborted at checkpoint 7
+of 7. Both are long standard-flow cases, and both should be run first when the
+quota is fresh rather than last.
 
 ---
 
