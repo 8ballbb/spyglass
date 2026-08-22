@@ -505,7 +505,7 @@ Note which option comes first. Doing nothing is the cheapest outcome available, 
 
 ## Artefact Formats
 
-Folder layout, both status vocabularies, the `PLANS_INDEX.md` and `INDEX.md` templates, the single-session success path, `session-context.md` contents, and the `user_overrides` entry format are all specified in `artefact-formats.md`, a sibling of this file. **Read it before writing anything in Phase 11**, and when reading prior artefacts in Phase 1.
+Folder layout, both status vocabularies, the `PLANS_INDEX.md` and `INDEX.md` templates, **the headings `pseudocode.md` must use**, the single-session success path, `session-context.md` contents, and the `user_overrides` entry format are all specified in `artefact-formats.md`, a sibling of this file. **Read it before writing anything in Phase 11**, and when reading prior artefacts in Phase 1.
 
 ## `--complete` Flow
 

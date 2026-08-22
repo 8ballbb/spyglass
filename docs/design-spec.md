@@ -123,7 +123,7 @@ spyglass/
 {
   "name": "spyglass",
   "description": "Design-first Python development: pseudo-code planning, reuse investigation, style enforcement, and signal-driven refactor detection before any code is written",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": { "name": "<author>", "email": "<email>" },
   "homepage": "https://github.com/<user>/spyglass",
   "repository": "https://github.com/<user>/spyglass",
