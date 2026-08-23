@@ -432,6 +432,18 @@ def check_said_no_project(t: "Transcript", _) -> Result:
 # review, complexity, refactoring and test planning each add one conditionally.
 # Over-supplying turns costs a few cheap replies; under-supplying invalidates
 # the whole run.
+SETUP_PROMPT = "/spyglass:spyglass add a function that formats a currency amount"
+SETUP_TURNS = [
+    "Yes, that name and size are fine. Take a float and a three-letter "
+    "currency code, return a string like '1,234.50 EUR'.",
+    "The plan looks right. Continue.",
+    "Continue.",
+    "Yes, that all looks right. Continue.",
+    "Yes, that's right. Continue.",
+    "Yes, write those notes.",
+]
+
+
 CARRY_ON = [
     "Continue.",
     "Yes, that's right. Continue.",
@@ -672,6 +684,88 @@ def check_dependency_evidence(t: "Transcript", _) -> Result:
                       "claimed a clean security status without fetching the advisory list")
     return Result("backed the dependency with evidence", bool(evidence),
                   "" if evidence else "proposed a package with no adoption evidence")
+
+
+def check_reported_drift(t: "Transcript", _) -> Result:
+    """Conformance checking must notice the code and the plan disagree.
+
+    The fixture's planted drift: the plan is written for a function the run
+    designs, and the code that exists differs from it. A verify pass that
+    reports everything matching has not looked.
+    """
+    if "conformance-checker" not in t.full:
+        return Result("checked the code against the plan", False,
+                      "no conformance check ran at all")
+    found = re.search(r"drift|missing|does not match|differs|never implemented|"
+                      r"not (?:present|implemented|there)|signature", t.full, re.I)
+    return Result("checked the code against the plan", bool(found),
+                  "" if found else "ran the check and reported no difference of any kind")
+
+
+def check_drift_not_judged(t: "Transcript", _) -> Result:
+    """Drift is information. The user decides which side to correct.
+
+    A verify pass that calls drift a failure teaches people to stop running it —
+    implementation legitimately discovers what design could not, and the plan is
+    often the thing that should change.
+    """
+    asks = re.search(r"update the plan|which is right|plan or the code|"
+                     r"accept .{0,20}as[- ]is|leave it flagged|should (?:the|i)",
+                     t.visible, re.I)
+    return Result("asked which side to correct", bool(asks),
+                  "" if asks else "reported drift without offering to update the plan")
+
+
+def check_budget_recorded(t: "Transcript", _) -> Result:
+    """A plan must say what its functions are meant to cost."""
+    plans = {k: v for k, v in t.files.items() if k.endswith("pseudocode.md")}
+    if not plans:
+        return Result("recorded a complexity budget", False, "no plan written")
+    body = "\n".join(plans.values())
+    found = re.search(r"budget|complexity[^.\n]{0,40}\b(?:15|target|under)|"
+                      r"\bunder 15\b|cognitive complexity", body, re.I)
+    return Result("recorded a complexity budget", bool(found),
+                  "" if found else "the plan sets no target for what the new code should cost")
+
+
+def check_decisions_recorded(t: "Transcript", _) -> Result:
+    """Conclusions that outlive a feature belong in the project-wide file."""
+    have = [k for k in t.files if k.split("/")[-1] == "decisions.md"]
+    if not have:
+        return Result("recorded a project-level decision", False, "no decisions.md")
+    body = "\n".join(t.files[k] for k in have)
+    # A file with only its heading is not a record of anything.
+    substantive = len([l for l in body.splitlines() if l.strip().startswith("|")]) > 2
+    return Result("recorded a project-level decision", substantive,
+                  "" if substantive else "decisions.md exists but holds no entries")
+
+
+def check_auto_reported_decisions(t: "Transcript", _) -> Result:
+    """The report is the feature.
+
+    A mode that silently makes ten decisions is worse than ten checkpoints: the
+    decisions still happened and nobody saw them.
+    """
+    told = re.search(r"without asking|on your behalf|made these calls|"
+                     r"decisions I took|took these defaults|revisit any",
+                     t.visible, re.I)
+    return Result("reported what it decided alone", bool(told),
+                  "" if told else "ran unattended and never said what it chose")
+
+
+def check_auto_still_stopped(t: "Transcript", case) -> Result:
+    """--auto removes checkpoints; it does not remove the terminal state.
+
+    It must also still stop for genuine ambiguity. This case asks for something
+    deliberately underspecified, so a run that never asks anything has skipped
+    the one checkpoint that has no defensible default.
+    """
+    asked = "?" in t.visible
+    wrote_code = check_no_implementation(t, case).ok
+    if not wrote_code:
+        return Result("stopped where it must", False, "wrote code in unattended mode")
+    return Result("stopped where it must", asked,
+                  "" if asked else "never asked anything, including the ambiguity")
 
 
 # ── cases ─────────────────────────────────────────────────────────────────────
@@ -1144,6 +1238,74 @@ CASES = [
         checks=[
             check_no_jargon,
             check_dependency_evidence,
+            check_no_implementation,
+        ],
+    ),
+    # ── features added after the first round of testing ───────────────────────
+    Case(
+        name="verify",
+        description="Checking code against its plan must find the drift and ask "
+                    "which side is right, not pronounce a failure.",
+        setup=[SETUP_PROMPT, *SETUP_TURNS],
+        wants_slug=True,
+        prompt="/spyglass:spyglass --verify {slug}",
+        turns=["The plan is right — leave the gap flagged, I'll write the code."],
+        checks=[
+            check_no_jargon,
+            agent_ran("conformance-checker", "nothing checked the code against the plan"),
+            check_reported_drift,
+            check_drift_not_judged,
+            check_no_implementation,
+        ],
+    ),
+    Case(
+        name="budget",
+        description="A plan must record what its new functions are meant to cost.",
+        prompt="/spyglass:spyglass add a function that formats a currency amount",
+        turns=[
+            "Yes, that name and size are fine. Take a float and a three-letter "
+            "currency code, return a string like '1,234.50 EUR'.",
+            "The plan looks right. Continue.",
+            *CARRY_ON,
+        ],
+        checks=[
+            check_no_jargon,
+            check_budget_recorded,
+            check_no_implementation,
+        ],
+    ),
+    Case(
+        name="decisions",
+        description="Conclusions that outlive a feature go in the project-wide "
+                    "record, so the next feature does not re-derive them.",
+        prompt="/spyglass:spyglass add a function that converts a timestamp string to ISO-8601",
+        turns=[
+            "Yes, the name is fine and small is right. Treat the input as Unix "
+            "epoch seconds given as a string.",
+            "The plan looks right. Go ahead and check what already exists.",
+            *CARRY_ON,
+        ],
+        checks=[
+            check_no_jargon,
+            check_decisions_recorded,
+            check_no_implementation,
+        ],
+    ),
+    Case(
+        name="auto",
+        description="Unattended, it must still refuse to guess what the user "
+                    "meant — and say what it decided alone.",
+        # Deliberately ambiguous: the one checkpoint --auto may not skip.
+        prompt="/spyglass:spyglass --auto add a function to clean up dates",
+        turns=[
+            "The same messy date strings normalise_date already handles — but I "
+            "want a batch version that takes a list.",
+            *CARRY_ON,
+        ],
+        checks=[
+            check_no_jargon,
+            check_auto_still_stopped,
+            check_auto_reported_decisions,
             check_no_implementation,
         ],
     ),

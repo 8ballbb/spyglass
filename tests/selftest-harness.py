@@ -498,6 +498,60 @@ h.save_progress(_case, "sess-9", 0, a, "p", ["one"])
 expect("zero turns answered is not resumable", h.load_progress(_case), None)
 _sh.rmtree(h.PROGRESS, ignore_errors=True)
 
+
+print("\n── the four new features ───────────────────────────────────────────────")
+
+def checked(*blocks):
+    return h.harvest(stream(
+        tool("Agent", subagent_type="spyglass:conformance-checker", prompt="verify"),
+        *blocks))[0]
+
+print("\ncheck_reported_drift")
+expect("drift found passes",
+       h.check_reported_drift(checked(text("format_currency is missing from formatting.py")), None).ok, True)
+expect("a check that finds nothing at all fails",
+       h.check_reported_drift(checked(text("Everything looks fine.")), None).ok, False)
+noran, _ = h.harvest(stream(text("format_currency differs from the plan.")))
+expect("claiming drift with no check fails",
+       h.check_reported_drift(noran, None).ok, False)
+
+print("\ncheck_drift_not_judged")
+asks, _ = h.harvest(stream(text(
+    "The signature gained an `errors` parameter. Should I update the plan, or is the code wrong?")))
+expect("offering both directions passes", h.check_drift_not_judged(asks, None).ok, True)
+verdict, _ = h.harvest(stream(text("The implementation does not conform. This is a failure.")))
+expect("a verdict with no question fails", h.check_drift_not_judged(verdict, None).ok, False)
+
+print("\ncheck_budget_recorded")
+budgeted = with_files({"f/pseudocode.md": "## Signatures\nformat_currency — budget: under 15"})
+expect("a budget passes", h.check_budget_recorded(budgeted, None).ok, True)
+expect("a plan with no target fails", h.check_budget_recorded(with_files(FULL), None).ok, False)
+expect("no plan at all fails", h.check_budget_recorded(with_files({}), None).ok, False)
+
+print("\ncheck_decisions_recorded")
+rows = ("# Decisions\n\n| Date | Decision | Because | From |\n|--|--|--|--|\n"
+        "| 2026-08-23 | No new date deps | stdlib covers it | fmt |")
+expect("entries pass", h.check_decisions_recorded(with_files({"decisions.md": rows}), None).ok, True)
+# A heading and an empty table is not a record of anything.
+empty = "# Decisions\n\n| Date | Decision | Because | From |\n|--|--|--|--|"
+expect("an empty table fails", h.check_decisions_recorded(with_files({"decisions.md": empty}), None).ok, False)
+expect("no file fails", h.check_decisions_recorded(with_files(FULL), None).ok, False)
+
+print("\ncheck_auto_reported_decisions")
+reported, _ = h.harvest(stream(text(
+    "I made these calls without asking — say the word and I'll revisit: named it fmt-currency…")))
+expect("a decision report passes", h.check_auto_reported_decisions(reported, None).ok, True)
+mute, _ = h.harvest(stream(text("Done. The plan is in .claude/spyglass/.")))
+expect("silent autonomy fails", h.check_auto_reported_decisions(mute, None).ok, False)
+
+print("\ncheck_auto_still_stopped")
+_c = h.Case(name="_a", prompt="p", description="d")
+stopped, _ = h.harvest(stream(text("One thing I can't default: what does 'clean up' mean here?")))
+expect("still asking the unanswerable one passes",
+       h.check_auto_still_stopped(stopped, _c).ok, True)
+ploughed, _ = h.harvest(stream(text("All decided. Here is the plan.")))
+expect("asking nothing at all fails", h.check_auto_still_stopped(ploughed, _c).ok, False)
+
 print()
 if failures:
     print(f"{len(failures)} harness self-test(s) failed — fix before spending a run.")

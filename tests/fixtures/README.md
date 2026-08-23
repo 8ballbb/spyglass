@@ -139,6 +139,21 @@ stateful flows, and the phases and signals no earlier case reached.
 | `oversized-module` | A plan pushing a class past its size limit raises that before code is written | P5 |
 | `new-dependency` | A proposed package carries adoption evidence and no invented security clearance | — |
 
+The third set covers the features added after the first round of testing.
+
+| Case | Proves | Plant |
+|---|---|---|
+| `verify` | Code is checked against the plan it came from, and drift is a question rather than a verdict | — |
+| `budget` | A plan records what its new functions are meant to cost | — |
+| `decisions` | Conclusions that outlive a feature reach the project-wide record | P4 |
+| `auto` | Unattended, it still refuses to guess what was meant, and says what it decided alone | P1 |
+
+`auto` is the one to watch. `--auto` exists to remove checkpoints, and the case
+asks for something deliberately underspecified — so it passes only if the mode
+still stops at the single checkpoint that has no defensible default. A green
+here means the exemption held; a red means `--auto` guessed at intent, which is
+the failure the whole skill exists to prevent.
+
 Three of these assert *ordering* rather than existence, which is why the harness
 snapshots the artefact tree after every turn:
 
