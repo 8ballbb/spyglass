@@ -8,6 +8,7 @@ Reference for the spyglass skill. Read when writing artefacts in Phase 11, or wh
 <artefact-dir>/
 ├── .gitignore                       # contains "*" — makes this tree invisible to git
 ├── PLANS_INDEX.md
+├── decisions.md                     # project-wide; survives individual features
 └── <feature-slug>/
     ├── INDEX.md
     ├── pseudocode.md
@@ -66,6 +67,27 @@ Optional files appear as `not-run` when skipped:
 | test-plan.md | — | not-run |
 | completed-summary.md | — | pending |
 ```
+
+## `decisions.md`
+
+Project-wide, not per-feature. Read in **Phase 1**, appended in **Phase 11**.
+
+Everything else here is scoped to one feature, so each new feature re-derives conclusions the last one already reached. Across a single day of testing, `python-dateutil is declared but not installed` was rediscovered four times and dateutil was independently reasoned about and rejected twice. Four agents ran each time to arrive somewhere the project already knew.
+
+```markdown
+# Decisions
+
+| Date | Decision | Because | From |
+|------|----------|---------|------|
+| 2026-08-14 | Not adopting `python-dateutil` | Declared in pyproject.toml but not installed; the inputs are epoch seconds, which it does not parse | convert-timestamp-iso8601 |
+| 2026-08-19 | New aggregations go in their own module, not `ReportBuilder` | The class is already near the 200-line limit | aggregations-reportbuilder |
+```
+
+**Record only decisions with reasons that outlive their feature.** "We chose the name `to_iso8601`" is feature-scoped and belongs in `session-context.md`. "This project does not take on new date-parsing dependencies" is not.
+
+**Consult it in Phase 5, before dispatching the searchers.** A prior rejection is a strong prior, not a rule: cite it, say when it was made, and re-check anything that turns on a fact that may have changed — an uninstalled package may since have been installed. Never treat an old decision as closing a question the user has just reopened by asking.
+
+**Never rewrite or delete an entry.** Superseding one means adding a new row that says so. The value here is the reasoning trail, and a trail that gets tidied is just the current state with extra steps.
 
 ## `<feature>/pseudocode.md`
 

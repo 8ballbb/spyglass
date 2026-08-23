@@ -78,7 +78,8 @@ Cost is proportional to how much of that flow actually runs — most runs use fa
 | `fast-path-add` (one small new function or class) | 5–6 | codebase-searcher, stdlib-searcher, deps-searcher, synthesiser, style-checker, + refactor-assessor if a signal fires |
 | Standard, no conditionals, no signals | 7 | scope-assessor, all 4 library-investigation searchers, synthesiser, style-checker |
 | Standard + pattern analysis + complexity | 9 | the above + pattern-analyzer, complexity-assessor |
-| Everything, including refactor and test planning | 11 | all agents |
+| Everything, including refactor and test planning | 11 | every design agent |
+| `--verify <slug>` (separate flow, no design) | 1 | conformance-checker |
 
 The two fast paths are chosen automatically from the task description — a short description that clearly names an existing function to modify, or clearly describes one small new function. **Both drop to two checkpoints** rather than ten: one to confirm the name and size, one to approve the plan. Anything else runs the standard flow.
 

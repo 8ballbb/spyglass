@@ -28,6 +28,8 @@ A Claude Code plugin providing a skill that enforces disciplined Python developm
 - `/spyglass:spyglass --refactor <task description>` — force refactor assessment even when no signal fires
 - `/spyglass:spyglass --no-refactor <task description>` — suppress refactor assessment even when signals fire (complexity is still measured)
 - `/spyglass:spyglass --complete <feature-slug>` — mark a feature complete and write summary
+- `/spyglass:spyglass --verify <feature-slug>` — check implemented code against the plan it came from
+- `/spyglass:spyglass --auto <task description>` — run to completion, taking the default at every checkpoint that has one
 
 These are keywords recognised in the invocation text, not CLI flags.
 
@@ -63,7 +65,8 @@ Derived from each path's run list, counting one agent per agent-backed phase. Ph
 | `fast-path-add` | 5–6 | codebase-searcher, stdlib-searcher, deps-searcher, synthesiser, style-checker, + refactor-assessor if a signal fires |
 | Standard, no conditionals, no signals | 7 | scope-assessor, 4 searchers, synthesiser, style-checker |
 | Standard with pattern analysis and complexity assessment | 9 | the above + pattern-analyzer, complexity-assessor |
-| Everything including refactor and test planning | 11 | all |
+| Everything including refactor and test planning | 11 | every design agent |
+| `--verify <slug>` — separate flow, no design phases | 1 | conformance-checker |
 
 ---
 
@@ -494,6 +497,38 @@ Ask: "Design is complete. How do you want to proceed?"
 Wait for: an explicit choice. Never begin implementing without one.
 
 ---
+
+## Four features added after the first round of behavioural testing
+
+Each answers something the testing exposed rather than something the original design anticipated.
+
+### `--verify <slug>` — conformance checking
+
+The plugin's premise is that designing first produces better code. Nothing checked whether the design was followed, so the premise was asserted rather than demonstrated. A plan approved, ignored during implementation, and filed as complete is worse than no plan: it leaves a document that reads like a description of the code and is not one.
+
+The instinct already existed and was unreliable. In one `--complete` run the model noticed unprompted that the implementation had never happened — *"there's no `src/dataflow/formatting.py`, and `__init__.py` still only exports `normalise_date`"* — and refused to write a summary implying otherwise. That was luck. `spyglass:conformance-checker` makes it a phase: signatures parsed with `ast` rather than read by eye, symbols located by grep, budgets measured with the same tool preference as Phase 8.
+
+**Drift is reported, never judged.** Implementation legitimately discovers what design could not, so the question at HIL-11 is which side to correct — and updating the plan is a valid answer. A tool that reports drift as failure teaches people to stop running it.
+
+### Complexity budgets
+
+Phase 8 measures what already exists. Nothing said what the new code was *supposed* to cost. One run recommended a refactor "estimated to land comfortably under 15" and nobody ever checked.
+
+Phase 4b now records a target per planned function, and `--verify` measures against it. That is one number per function, and it converts an observation into a commitment — a threshold agreed before the code exists, which no linter can offer. Targets, not gates: nothing blocks on one.
+
+### `decisions.md` — project-level memory
+
+Every artefact was feature-scoped, so each feature re-derived what the last one concluded. Across a single day of testing, `python-dateutil is declared but not installed` was rediscovered four times, and dateutil was independently reasoned about and rejected twice on different grounds.
+
+Read in Phase 1, consulted in Phase 5 before the searchers are dispatched, appended in Phase 11. **A prior decision is a strong prior, not a rule** — many turn on facts that expire, and an uninstalled package may since have been installed. It saves the argument, not the search. Entries are never rewritten or deleted; superseding one adds a row saying so, because the value is the reasoning trail.
+
+### `--auto`
+
+Ten checkpoints is a lot for a change the user has already thought about, and the skill's own reasoning says checkpoints carrying no real decision "train the user to stop reading the ones that do". The behavioural suite needed eight to eleven scripted replies per case, most of them "Continue."
+
+Two checkpoints survive it: **HIL-1b**, because there is no defensible default for "which of two different things did you want", and **HIL-6**, because auto-accepting a hard violation writes into the plan something the project's own standards say must not ship. Defaults are conservative throughout — where a checkpoint offers to do more work, the default is not to, so an unattended run cannot grow the task.
+
+Every decision taken is reported at the end and marked in `session-context.md` as auto-taken rather than user-confirmed. **That report is the feature.** A mode that silently makes ten decisions is worse than ten checkpoints, because the decisions still happened and nobody saw them.
 
 ## Phase Specifications
 

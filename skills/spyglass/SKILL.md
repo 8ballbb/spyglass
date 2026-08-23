@@ -13,7 +13,18 @@ Structured design analysis before any Python implementation. It prevents reimple
 
 **Terminal state.** This skill produces design artefacts and stops at Phase 12. It does not implement. Implementation happens only after an explicit choice at HIL-10 — never on the skill's own initiative, and never as an inferred continuation.
 
-**Invocation keywords** — recognised in the invocation text, not CLI flags: `--tests` forces test planning (Phase 10); `--refactor` forces refactor assessment even when no signal fires; `--no-refactor` suppresses it even when signals fire (complexity is still measured); `--complete <feature-slug>` marks a feature complete and writes its summary. Scope: Python projects only.
+**Invocation keywords** — recognised in the invocation text, not CLI flags:
+
+| Keyword | Effect |
+|---|---|
+| `--tests` | Force test planning (Phase 10) |
+| `--refactor` | Force refactor assessment even when no signal fires |
+| `--no-refactor` | Suppress it even when signals fire (complexity is still measured) |
+| `--complete <slug>` | Mark a feature complete and write its summary |
+| `--verify <slug>` | Check implemented code against the plan it came from |
+| `--auto` | Run to completion, taking the default at every checkpoint that has one |
+
+Scope: Python projects only.
 
 ## Speaking to the User
 
@@ -109,7 +120,7 @@ If neither matches, run the standard flow.
 ## Phase Flow
 
 ```
-Phase 1  — Context check           [Required]    Locate artefact dir, read index, detect orphans, generate slug
+Phase 1  — Context check           [Required]    Locate artefact dir, read index and decisions, detect orphans, generate slug
 Phase 2a — Lightweight scope check [Required]    Obvious signal from task description
            └─ HIL-1 (batched): slug + prior context + scope signal
            └─ HIL-1b [Conditional]: clarify an ambiguous request before designing
@@ -135,6 +146,10 @@ Phase 11 — Artefact update         [Required]    Write index and session files
            └─ HIL-9: confirm content before writing
 Phase 12 — Handoff                 [Required]    Present artefacts, choose next step
            └─ HIL-10: implement now / hand to writing-plans (if available) / stop here
+
+Separate flows, no design phases:
+  --complete <slug>   draft summary → confirm → write, mark complete
+  --verify <slug>     conformance-checker → HIL-11: plan vs code, decide which is right
 ```
 
 **The numbering is not an error.** Phase numbers label design concerns, not execution positions. Phases 2 and 4 are each split because their halves belong at different points: scope needs a plan to judge (2a/2b), and pattern analysis needs a module design to target but must precede contract design (4a/4b).
@@ -147,7 +162,7 @@ Phase 12 — Handoff                 [Required]    Present artefacts, choose nex
 
 ### Phase 1 — Context Check — Required
 
-No agent; main instance. Resolve the artefact directory (above), then: (1) read `PLANS_INDEX.md` if present, noting its absence otherwise; (2) identify feature folders semantically related to the current task — reason about relevance rather than matching strings; (3) for each, read `INDEX.md` to surface pending sub-tasks, session context, and deferred refactors; (4) detect orphaned state (see Orphaned State Recovery), surfacing it at HIL-1 if found; (5) generate the slug — lowercase, hyphens for spaces, stop words stripped, max 30 characters. Stop words are the grammatical filler only — articles, prepositions, conjunctions, and auxiliary verbs (`a`, `the`, `to`, `for`, `of`, `in`, `and`, `add`). Nouns that carry meaning are kept, even when the result is well under the cap: "Add CSV export to data pipeline" → `csv-export-data-pipeline`.
+No agent; main instance. Resolve the artefact directory (above), then: (1) read `PLANS_INDEX.md` if present, noting its absence otherwise; (2) identify feature folders semantically related to the current task — reason about relevance rather than matching strings; (3) for each, read `INDEX.md` to surface pending sub-tasks, session context, and deferred refactors; (4) read `decisions.md` if present — the project's standing conclusions, which shape the reuse investigation later and occasionally answer the task outright; (5) detect orphaned state (see Orphaned State Recovery), surfacing it at HIL-1 if found; (6) generate the slug — lowercase, hyphens for spaces, stop words stripped, max 30 characters. Stop words are the grammatical filler only — articles, prepositions, conjunctions, and auxiliary verbs (`a`, `the`, `to`, `for`, `of`, `in`, `and`, `add`). Nouns that carry meaning are kept, even when the result is well under the cap: "Add CSV export to data pipeline" → `csv-export-data-pipeline`.
 
 → batched into **HIL-1**
 
@@ -198,6 +213,10 @@ Plus class skeletons with `__init__`, public methods, and `@property` definition
 
 **Save:** on HIL-3 approval, write all three stages to `<artefact-dir>/<slug>/pseudocode.md`. This is the working document for the rest of the run.
 
+**Record a complexity budget for each planned function.** In the *Signatures* section, note the cognitive complexity you expect it to land under — 15 unless the function has a stated reason to be denser, in which case say the reason. This costs one number per function and converts an observation into a commitment: Phase 8 measures what already exists, and nothing else in this flow says what the new code is *supposed* to cost. `--verify` checks the built code against these later.
+
+Budgets are targets, not gates. Nothing here blocks on one, and a function that lands over budget for a good reason is a conversation, not a defect.
+
 **Use these exact headings in the file. Do not write "Level 1", "Level 2", or "Level 3" anywhere in it:**
 
 ```markdown
@@ -225,6 +244,8 @@ Plus class skeletons with `__init__`, public methods, and `@property` definition
 → **HIL-4**
 
 ### Phase 5 — Library Investigation — Required
+
+**Read `decisions.md` first.** It records what this project has already concluded and why. A prior rejection is a strong prior, not a rule — cite it, say when it was made, and still dispatch the searchers, because a decision that turned on a fact ("not installed", "no release in two years") may no longer hold. What it saves is not the search but the argument: the synthesis starts from what the project already knows instead of re-deriving it.
 
 **Dispatch all four agents in a single response** so they run concurrently. Phase 6 blocks until all have returned. Each reports "no findings" on failure rather than erroring. Under `fast-path-add`, only the first two run.
 
@@ -318,7 +339,11 @@ No identifier, no phase name, no "this triggers". The user learns what is true a
 
 ### Phase 11 — Artefact Update — Required
 
-No agent; main instance. Content is confirmed at HIL-9 **before any write**. Read `artefact-formats.md` before writing anything — it carries the status vocabularies, templates, and file contents.
+No agent; main instance. Content is confirmed at HIL-9 **before any write**.
+
+**Also append to `decisions.md`** any decision from this run whose reasoning outlives the feature — a dependency rejected and why, a structural constraint discovered, a convention settled. Feature-scoped decisions stay in `session-context.md`. Include the proposed rows in what HIL-9 confirms; this file is project-wide and never rewritten, so a bad row is permanent.
+
+Read `artefact-formats.md` before writing anything — it carries the status vocabularies, templates, and file contents.
 
 **Phase 11 owns every write in the run**, except three that are explicitly gated at their own checkpoints: `pseudocode.md` on HIL-3 approval, `pseudocode.md` again after HIL-6 resolves style violations, and `test-plan.md` after HIL-8. Everything else — `PLANS_INDEX.md`, `INDEX.md`, `session-context.md`, `future-tasks.md`, and the *Preliminary refactors* section adopted at HIL-7 — is written here and nowhere earlier. Earlier phases name destinations; this phase performs the writes.
 
@@ -350,6 +375,37 @@ Refactor assessment is not something the user has to ask for. Watch for four sig
 **When no signal fires and no keyword is given:** Phase 9 does not run, and Phase 8's complexity report folds into the Phase 12 summary — visible, without a checkpoint interrupting for a decision with nothing behind it.
 
 Each fired signal is reported at HIL-7 with its evidence, so the user sees *why* the assessment ran.
+
+## `--auto` — running without stopping
+
+Ten checkpoints is a lot to sit through for a change you have already thought about. `--auto` runs the flow to completion, taking the default at every checkpoint that has one, and presents every decision it made at the end for review.
+
+**Two checkpoints still stop, and are not negotiable:**
+
+| Still stops | Why |
+|---|---|
+| **HIL-1b** — requirement clarification | It is the one checkpoint that asks what *you* meant. Guessing here is the failure this whole skill exists to prevent, and every later phase compounds it. There is no defensible default for "which of two different things did you want" |
+| **HIL-6** — hard style violations | A hard violation is a rule the project's own standards say must not ship. Auto-accepting one silently writes it into the plan |
+
+Everything else takes its default: the generated name, the module structure, the plan as designed, the scope assessment, the reuse recommendation, advisory style findings left unaddressed, refactors **not** adopted, the test plan as derived, and the artefacts as drafted. At HIL-10 it stops without implementing, exactly as a normal run does — `--auto` removes checkpoints, it does not remove the terminal state.
+
+**Default to the conservative option every time.** Where a checkpoint offers to do more work — adopt a refactor, expand scope, add a dependency — the default is not to. An unattended run should not be able to grow the task.
+
+### The decision report
+
+At the end, before Phase 12's handoff, list every decision taken on the user's behalf:
+
+> I made these calls without asking — say the word on any of them and I'll revisit:
+>
+> - Named it **`csv-export-data-pipeline`**
+> - Put the writer in a new `export.py` rather than extending `report.py`
+> - Left `python-dateutil` alone; the stdlib covers what the plan needs
+> - Did **not** adopt the suggested refactor of `load_records` — noted in future-tasks.md instead
+> - Two advisory style points left as-is: `summarise` has no return annotation, `export_rows` is 34 lines
+
+**This report is the point of the feature.** A mode that silently makes ten decisions is worse than ten checkpoints, because the decisions still happened and nobody saw them. Report them in the order they were made, say plainly what was chosen, and keep each to one line.
+
+**Record it in `session-context.md` too**, marked as auto-taken rather than user-confirmed. A later session must be able to tell "the user approved this" from "nobody was asked".
 
 ## HIL Checkpoint Specifications
 
@@ -506,6 +562,29 @@ Note which option comes first. Doing nothing is the cheapest outcome available, 
 ## Artefact Formats
 
 Folder layout, both status vocabularies, the `PLANS_INDEX.md` and `INDEX.md` templates, **the headings `pseudocode.md` must use**, the single-session success path, `session-context.md` contents, and the `user_overrides` entry format are all specified in `artefact-formats.md`, a sibling of this file. **Read it before writing anything in Phase 11**, and when reading prior artefacts in Phase 1.
+
+## `--verify` Flow
+
+**Trigger:** `--verify <feature-slug>`. No design phases run.
+
+This is the only place the design-first claim is tested. Everything else in this skill produces a plan; this asks whether the plan survived contact with the code. A plan that was approved, ignored during implementation and then filed away is worse than no plan, because it leaves a document that reads like a description of the code and is not one.
+
+1. Locate `<artefact-dir>/<feature-slug>/pseudocode.md`. Not found → list the available features from `PLANS_INDEX.md` and stop
+2. Dispatch **`spyglass:conformance-checker`** with the absolute plan path and any complexity budgets the plan recorded
+3. Present its findings → **HIL-11**
+4. On the user's decision, update `session-context.md` with what was accepted and why. Never edit their code
+
+**Drift is information, not a verdict.** Implementation legitimately discovers what design could not — an edge case needing another parameter, a return type that was wrong on paper. The useful question is *which* to correct: the plan or the code. Ask it that way. A run that reports drift as failure teaches people to stop running it.
+
+**`--verify` never edits code and never silently rewrites the plan.** Updating the plan to match reality is a valid outcome and requires the user to say so at HIL-11.
+
+### HIL-11 — Conformance findings *(only in the `--verify` flow)*
+
+**Present:** what matches, what drifted, what is missing, in that order — the summary first, so a clean result takes one line and does not read like a report of problems.
+
+**Ask:** for each drift, whether the code is right (update the plan) or the plan is right (leave it flagged for them to fix). Offer "accept all as-is" when everything looks deliberate; that is the common case and should cost one keystroke.
+
+**Wait for:** a decision per drift, or a blanket one. Then write `session-context.md`.
 
 ## `--complete` Flow
 
