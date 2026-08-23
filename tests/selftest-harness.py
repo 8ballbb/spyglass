@@ -515,6 +515,14 @@ noran, _ = h.harvest(stream(text("format_currency differs from the plan.")))
 expect("claiming drift with no check fails",
        h.check_reported_drift(noran, None).ok, False)
 
+print("\ncheck_named_the_drift")
+specific = checked(text(
+    "Plan says tz: str = 'UTC' and strict: bool; the code has assume_utc: bool = True."))
+expect("naming the parameters passes", h.check_named_the_drift(specific, None).ok, True)
+vague = checked(text("The signature does not match the plan."))
+expect("noticing a mismatch without naming it fails",
+       h.check_named_the_drift(vague, None).ok, False)
+
 print("\ncheck_drift_not_judged")
 asks, _ = h.harvest(stream(text(
     "The signature gained an `errors` parameter. Should I update the plan, or is the code wrong?")))

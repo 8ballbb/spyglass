@@ -768,6 +768,59 @@ def check_auto_still_stopped(t: "Transcript", case) -> Result:
                   "" if asked else "never asked anything, including the ambiguity")
 
 
+DRIFT_SLUG = "date-normalisation"
+# A plan that describes code which really exists, and describes it wrongly. The
+# fixture has `normalise_date(value: str, assume_utc: bool = True) -> str`.
+DRIFTED_PLAN = """# date-normalisation
+
+## Module design
+`src/dataflow/timeutils.py` — one public function for turning loose date strings
+into ISO-8601.
+
+## Contracts
+`normalise_date` accepts a date string and a timezone name. Raises `KeyError`
+for an unrecognised timezone; returns an ISO-8601 string otherwise.
+
+## Signatures
+```python
+def normalise_date(value: str, tz: str = "UTC", strict: bool = False) -> str: ...
+```
+Budget: cognitive complexity under 15.
+"""
+
+
+def plant_drifted_plan(cwd: Path) -> None:
+    """A finished plan whose code was built differently.
+
+    An earlier version of this case ran a real design conversation and then
+    verified it — but nothing had been implemented, so the check found a missing
+    function rather than a disagreement, and "update the plan or fix the code"
+    never came up. Drift needs code that exists and differs.
+    """
+    root = cwd / ".claude/spyglass"
+    (root / DRIFT_SLUG).mkdir(parents=True, exist_ok=True)
+    (root / DRIFT_SLUG / "pseudocode.md").write_text(DRIFTED_PLAN)
+    (root / "PLANS_INDEX.md").write_text(
+        "# Plans Index\n\n| Folder | Description | Status |\n"
+        "|--------|-------------|--------|\n"
+        f"| {DRIFT_SLUG} | ISO-8601 date normalisation | session-done |\n")
+    ignore = root / ".gitignore"
+    if not ignore.exists():
+        ignore.write_text("*\n")
+
+
+def check_named_the_drift(t: "Transcript", _) -> Result:
+    """It must name the actual difference, not just report that one exists.
+
+    The planted plan says `tz: str = "UTC"` and `strict: bool = False`; the code
+    has `assume_utc: bool = True`. A report that says "the signature differs"
+    without saying how has not done the comparison, it has noticed a mismatch.
+    """
+    named = re.search(r"assume_utc", t.full) and re.search(r"\btz\b|strict", t.full)
+    return Result("named the actual difference", bool(named),
+                  "" if named else "reported drift without naming which parameters differ")
+
+
 # ── cases ─────────────────────────────────────────────────────────────────────
 
 CASES = [
@@ -1246,14 +1299,14 @@ CASES = [
         name="verify",
         description="Checking code against its plan must find the drift and ask "
                     "which side is right, not pronounce a failure.",
-        setup=[SETUP_PROMPT, *SETUP_TURNS],
-        wants_slug=True,
-        prompt="/spyglass:spyglass --verify {slug}",
-        turns=["The plan is right — leave the gap flagged, I'll write the code."],
+        setup_fs=plant_drifted_plan,
+        prompt=f"/spyglass:spyglass --verify {DRIFT_SLUG}",
+        turns=["The code is right — update the plan to match it."],
         checks=[
             check_no_jargon,
             agent_ran("conformance-checker", "nothing checked the code against the plan"),
             check_reported_drift,
+            check_named_the_drift,
             check_drift_not_judged,
             check_no_implementation,
         ],
