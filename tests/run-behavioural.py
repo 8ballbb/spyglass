@@ -1334,7 +1334,127 @@ def snapshot(cwd: Path) -> dict[str, str]:
     return out
 
 
-def run_case(case: Case, dry: bool, model: str | None) -> bool | None:
+# ── resumable progress ────────────────────────────────────────────────────────
+#
+# A long case that dies at its last checkpoint used to throw away every turn and
+# start over. oversized-module was attempted seven times, twice reaching
+# checkpoint 8 of 8 before the session limit killed it — roughly fifty turns of
+# real agent work for no graded result.
+#
+# Progress is now written after every turn, so a retry continues the same
+# conversation instead of restarting it. Nothing here makes a run cheaper; it
+# makes the cost stick.
+
+PROGRESS = REPO / "tests/.progress"
+
+
+def progress_path(case: Case) -> Path:
+    return PROGRESS / f"{case.name}.json"
+
+
+def save_progress(case: Case, session: str | None, done: int,
+                  t: "Transcript", prompt: str, turns: list[str]) -> None:
+    PROGRESS.mkdir(exist_ok=True)
+    progress_path(case).write_text(json.dumps({
+        "session": session,
+        "turns_done": done,
+        "visible": t.visible,
+        "full": t.full,
+        # Per-turn, because the ordering checks compare the first snapshot with
+        # the last. Flattening to a final state would silently turn "wrote the
+        # summary before asking" into a pass.
+        "steps": [{"visible": st.visible, "full": st.full, "files": st.files}
+                  for st in t.steps],
+        "prompt": prompt,
+        "turns": turns,
+    }, indent=1))
+
+
+def load_progress(case: Case) -> dict | None:
+    p = progress_path(case)
+    if not p.is_file():
+        return None
+    try:
+        d = json.loads(p.read_text())
+    except json.JSONDecodeError:
+        return None
+    return d if d.get("session") and d.get("turns_done", 0) > 0 else None
+
+
+def clear_progress(case: Case) -> None:
+    progress_path(case).unlink(missing_ok=True)
+
+
+def rebuild(d: dict) -> "Transcript":
+    steps = [Transcript(st["visible"], st["full"], [], st.get("files", {}))
+             for st in d.get("steps", [])]
+    t = Transcript(d["visible"], d["full"], steps)
+    t.files = steps[-1].files if steps else {}
+    return t
+
+
+def converse(base: list[str], cwd: Path, session: str | None,
+             turns: list[str], start: int, t: "Transcript",
+             case: Case) -> tuple["Transcript", str | None, str | None]:
+    """Answer checkpoints from `start`, stopping the moment a run dies.
+
+    Returns the transcript, the session, and why it stopped (None if it did not).
+    The early stop matters as much as the resume: the abort used to be noticed
+    only after the whole list had run, so a session that died at turn two still
+    got six more invocations fired at it.
+    """
+    for i in range(start, len(turns)):
+        if not session:
+            return t, None, "no session id returned; cannot continue"
+        print(f"  answering checkpoint {i + 1}/{len(turns)}…")
+        _, out = sh(base + ["--resume", session, turns[i]], cwd=cwd)
+        more, s = harvest(out)
+        more.files = snapshot(cwd)
+        session = s or session
+        t = t + more
+        why = aborted(more)
+        save_progress(case, session, i + 1, t, "", turns)
+        if why:
+            return t, session, why
+    return t, session, None
+
+
+def finish(case: Case, transcript: "Transcript", why: str | None,
+           temp: Path | None) -> bool | None:
+    """Grade the run, or explain why there is nothing to grade."""
+    out_dir = REPO / "tests/.transcripts"
+    out_dir.mkdir(exist_ok=True)
+    (out_dir / f"{case.name}.full.txt").write_text(transcript.full)
+    (out_dir / f"{case.name}.visible.txt").write_text(transcript.visible)
+    (REPO / "tests/.last-transcript.txt").write_text(transcript.full)
+    (REPO / "tests/.last-visible.txt").write_text(transcript.visible)
+
+    if why:
+        done = len(transcript.steps) - 1
+        print(f"\n  ABORTED — {why}.")
+        print("  Not graded: nothing here reflects the plugin's behaviour.")
+        print(f"  Progress kept ({done} checkpoint{'' if done == 1 else 's'} "
+              f"answered). Re-run this case to continue where it stopped.")
+        return None
+
+    results = [c(transcript, case) for c in case.checks]
+    for r in results:
+        mark = "ok  " if r.ok else "FAIL"
+        print(f"  {mark}  {r.name}")
+        if r.detail:
+            print(f"        {r.detail}")
+
+    passed = all(r.ok for r in results)
+    print(f"\n  {'PASS' if passed else 'FAIL'}  ({sum(r.ok for r in results)}/{len(results)})")
+    print("  transcript: tests/.last-transcript.txt (full), "
+          ".last-visible.txt (what the user saw)")
+    # Graded means the conversation is spent; the next run must start clean.
+    clear_progress(case)
+    return passed
+
+
+def run_case(case: Case, dry: bool, model: str | None,
+              fresh: bool = False) -> bool | None:
     """True passed, False failed, None never ran.
 
     None is not a soft failure. A run that died before it started has no
@@ -1360,11 +1480,25 @@ def run_case(case: Case, dry: bool, model: str | None) -> bool | None:
             print("    then --resume <id>", repr(turn))
         return True
 
-    sync_plugin()
-    reset()
+    resumed = None if fresh else load_progress(case)
+    if resumed:
+        print(f"  resuming from checkpoint {resumed['turns_done']}"
+              f"/{len(resumed['turns'])} of an interrupted run")
+        print("  (fixture left as that run made it; --fresh to start over)")
+    else:
+        clear_progress(case)
+        sync_plugin()
+        reset()
     cwd, temp = workdir(case)
 
     try:
+        if resumed:
+            transcript = rebuild(resumed)
+            transcript, session, why = converse(
+                base, cwd, resumed["session"], resumed["turns"],
+                resumed["turns_done"], transcript, case)
+            return finish(case, transcript, why, temp)
+
         if case.setup:
             print(f"  setting up prior state ({len(case.setup)} turns, not graded)…")
             _, out0 = sh(base + [case.setup[0]], cwd=cwd)
@@ -1400,50 +1534,20 @@ def run_case(case: Case, dry: bool, model: str | None) -> bool | None:
         _, out = sh(base + [prompt], cwd=cwd)
         transcript, session = harvest(out)
         transcript.files = snapshot(cwd)
+        save_progress(case, session, 0, transcript, prompt, turns)
 
-        for i, turn in enumerate(turns, 1):
-            if not session:
-                print("  ! no session id returned; cannot continue the conversation")
-                return None
-            print(f"  answering checkpoint {i}/{len(turns)}…")
-            _, out_n = sh(base + ["--resume", session, turn], cwd=cwd)
-            more, s = harvest(out_n)
-            more.files = snapshot(cwd)
-            session = s or session
-            transcript = transcript + more
+        why = aborted(transcript)
+        if not why:
+            transcript, session, why = converse(
+                base, cwd, session, turns, 0, transcript, case)
+        return finish(case, transcript, why, temp)
 
         # Per case, not per run: `--case all` used to leave only the last
         # transcript on disk, so diagnosing an earlier failure meant paying for
         # the run again. The last-* names stay as a convenience for single runs.
-        out_dir = REPO / "tests/.transcripts"
-        out_dir.mkdir(exist_ok=True)
-        (out_dir / f"{case.name}.full.txt").write_text(transcript.full)
-        (out_dir / f"{case.name}.visible.txt").write_text(transcript.visible)
-        (REPO / "tests/.last-transcript.txt").write_text(transcript.full)
-        (REPO / "tests/.last-visible.txt").write_text(transcript.visible)
-
-        why = aborted(transcript)
-        if why:
-            print(f"\n  ABORTED — {why}.")
-            print("  Not graded: nothing here reflects the plugin's behaviour.")
-            return None
-
-        results = [c(transcript, case) for c in case.checks]
     finally:
         if temp:
             shutil.rmtree(temp, ignore_errors=True)
-
-    for r in results:
-        mark = "ok  " if r.ok else "FAIL"
-        print(f"  {mark}  {r.name}")
-        if r.detail:
-            print(f"        {r.detail}")
-
-    passed = all(r.ok for r in results)
-    print(f"\n  {'PASS' if passed else 'FAIL'}  ({sum(r.ok for r in results)}/{len(results)})")
-    print("  transcript: tests/.last-transcript.txt (full), "
-          ".last-visible.txt (what the user saw)")
-    return passed
 
 
 def main() -> None:
@@ -1455,6 +1559,10 @@ def main() -> None:
     ap.add_argument("--dry-run", action="store_true",
                     help="show what would run, spend nothing")
     ap.add_argument("--model", help="override the model for the run under test")
+    ap.add_argument("--fresh", action="store_true",
+                    help="discard saved progress and start the case over. "
+                         "Without it, a case interrupted mid-conversation "
+                         "resumes where it stopped")
     ap.add_argument("--repeat", type=int, default=1, metavar="N",
                     help="run each case N times and report the pass rate. "
                          "Intermittent behaviour is a real failure class and a "
@@ -1478,9 +1586,13 @@ def main() -> None:
 
     tally: dict[str, list[bool | None]] = {}
     for c in selected:
-        for _ in range(max(1, args.repeat)):
+        for n in range(max(1, args.repeat)):
+            # Each repetition must be an independent observation. Resuming the
+            # previous one would measure the same run twice.
+            if n:
+                args.fresh = True
             tally.setdefault(c.name, []).append(
-                run_case(c, args.dry_run, args.model))
+                run_case(c, args.dry_run, args.model, args.fresh))
 
     graded = {n: [r for r in runs if r is not None] for n, runs in tally.items()}
     ok = all(all(v) for v in graded.values()) and any(graded.values())

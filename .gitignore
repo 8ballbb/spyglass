@@ -17,3 +17,4 @@ tests/.last-transcript.txt
 tests/.last-visible.txt
 tests/.transcripts/
 tests/.tools-venv/
+tests/.progress/

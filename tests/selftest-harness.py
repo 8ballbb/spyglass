@@ -459,6 +459,45 @@ expect("no evidence fails", h.check_dependency_evidence(bare, None).ok, False)
 nosearch, _ = h.harvest(stream(text("I'd suggest ua-parser, it's popular.")))
 expect("never searching fails", h.check_dependency_evidence(nosearch, None).ok, False)
 
+
+print("\n── resume: progress must survive a round trip ──────────────────────────")
+
+import shutil as _sh
+_case = h.Case(name="_selftest", prompt="p", description="d",
+               turns=["one", "two", "three"])
+h.PROGRESS = Path(tempfile.mkdtemp(prefix="selftest-progress-"))
+
+expect("nothing saved means nothing to resume", h.load_progress(_case), None)
+
+a = h.harvest(stream(text("first turn")))[0]
+a.files = {"PLANS_INDEX.md": "x"}
+b = h.harvest(stream(text("second turn")))[0]
+b.files = {"PLANS_INDEX.md": "x", "f/completed-summary.md": "y"}
+combined = a + b
+h.save_progress(_case, "sess-9", 1, combined, "p", ["one", "two", "three"])
+
+d = h.load_progress(_case)
+expect("session recovered", d and d["session"], "sess-9")
+expect("turn index recovered", d and d["turns_done"], 1)
+
+back = h.rebuild(d)
+expect("transcript text survives", "first turn" in back.visible and "second turn" in back.visible, True)
+# The ordering checks compare the first snapshot against the last. Flattening
+# to a final state on save would turn "wrote it before asking" into a pass.
+expect("per-turn snapshots survive", len(back.steps), 2)
+expect("first snapshot is still the first",
+       "f/completed-summary.md" in back.steps[0].files, False)
+expect("ordering check still works across a resume",
+       h.check_summary_written_after_confirming(back, None).ok, True)
+
+h.clear_progress(_case)
+expect("clearing removes it", h.load_progress(_case), None)
+
+# A save with no turns answered is not something to resume into.
+h.save_progress(_case, "sess-9", 0, a, "p", ["one"])
+expect("zero turns answered is not resumable", h.load_progress(_case), None)
+_sh.rmtree(h.PROGRESS, ignore_errors=True)
+
 print()
 if failures:
     print(f"{len(failures)} harness self-test(s) failed — fix before spending a run.")
