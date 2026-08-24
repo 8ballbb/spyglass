@@ -530,6 +530,34 @@ Two checkpoints survive it: **HIL-1b**, because there is no defensible default f
 
 Every decision taken is reported at the end and marked in `session-context.md` as auto-taken rather than user-confirmed. **That report is the feature.** A mode that silently makes ten decisions is worse than ten checkpoints, because the decisions still happened and nobody saw them.
 
+## Four further features, added after the second round
+
+### `[tool.spyglass]` configuration
+
+`decisions.md` records decisions; nothing recorded *preferences*. The fixture has three docstring styles and every single run raised it. The complexity threshold was hardcoded at 15 in three separate documents, which made it the tool's opinion rather than the project's.
+
+Read once in Phase 1, from `pyproject.toml` or a `.spyglass.toml` beside it. Precedence is session > config > inference > default — **what the user says now always wins**, because a config that overrides a live instruction is a bug, not a feature.
+
+**Never written.** Same reasoning as the root `.gitignore`: it is tracked, it is theirs, and a plugin that edits a project's config produces an unexpected diff in someone's next commit. Where a session establishes something worth keeping, Phase 12 says so in one line and lets them add it.
+
+### `--audit <path>`
+
+Every other flow requires a task, which meant the plugin was worth nothing until you were already about to write code. `--audit` points `pattern-analyzer`, `complexity-assessor` (in `audit_mode`) and `style-checker` (in `source_mode`) at existing code and returns a backlog.
+
+Source mode matters: the style checker was written to review a plan, and three of its rules — imports inside functions, real function lengths, docstring presence — cannot be checked against one. They can be checked against code.
+
+**Ordered by what a finding costs to live with, not by severity.** A grade-F function nobody touches matters less than a grade-C one in the middle of everything. **Capped at fifteen**, because the fastest way to make this worthless is to return forty findings.
+
+### `conformance-log.md`
+
+Every other artefact is read within the feature that wrote it. This one is the only thing here that compounds: one drift is noise, the same drift four times is a fact about how this project designs, and Phase 4b reads it back while designing the thing likely to repeat it.
+
+**Three occurrences, not two.** Two is a coincidence, and a design pass that lectures on two data points is worse than one that says nothing. It is always presented as an observation, never a rule.
+
+### mypy in conformance checking
+
+The conformance checker states its own limit plainly — behaviour is not visible in a signature. mypy closes part of that gap: contracts state types, and mypy checks whether they hold at the call sites, which neither grep nor `ast` can do. Same optional-tool pattern as complexipy: used when present, never prompted for, silently skipped otherwise. Only errors touching planned symbols are reported, since a project's pre-existing type debt is not this feature's drift.
+
 ## Phase Specifications
 
 *Ordered by execution sequence.*

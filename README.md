@@ -39,7 +39,16 @@ If your request is open to more than one reading in a way that would change the 
 /spyglass:spyglass --refactor <task description>    force refactor assessment even when no signal fires
 /spyglass:spyglass --no-refactor <task description> suppress refactor assessment even when signals fire
 /spyglass:spyglass --complete <feature-slug>        mark a feature complete and write its summary
+/spyglass:spyglass --verify <feature-slug>          check the built code against the plan it came from
+/spyglass:spyglass --audit <path>                   assess existing code, no task needed
+/spyglass:spyglass --auto <task description>        run to completion, taking sensible defaults
 ```
+
+**`--audit` is the one to try first.** Everything else needs a task before it is any use; `--audit src/` points the assessment agents at code you already have and returns a prioritised backlog — complexity in code that changes often, conventions that genuinely conflict, classes past their size limit. Capped at fifteen findings, because a backlog nobody can finish is a backlog nobody starts.
+
+**`--verify` is what makes design-first checkable.** After you have implemented a plan, it compares what was built against what was designed — missing symbols, signature drift, functions over their complexity budget — and asks which side to correct. Drift is often the plan's fault, and updating the plan is a valid answer.
+
+**`--auto` runs unattended** and takes the default at every checkpoint except two: when your request is genuinely ambiguous, and when the plan breaks a rule your standards say must not ship. It reports every decision it made at the end.
 
 The `plugin:skill` form is how Claude Code addresses a plugin's skills — the same shape as `/superpowers:brainstorming`. A bare `/spyglass` will not resolve.
 
@@ -84,6 +93,22 @@ Cost is proportional to how much of that flow actually runs — most runs use fa
 The two fast paths are chosen automatically from the task description — a short description that clearly names an existing function to modify, or clearly describes one small new function. **Both drop to two checkpoints** rather than ten: one to confirm the name and size, one to approve the plan. Anything else runs the standard flow.
 
 Even on the fast path, Spyglass still checks what your project already depends on. Those packages are already installed and already paid for — a project that depends on a mature date parser should never be handed a hand-rolled one because nobody looked. Only the search for *new* PyPI packages is skipped, since adding a dependency for one small function rarely makes sense.
+
+## Configuration
+
+Optional. Some answers do not change between features, and being asked each time turns a settled matter into an interruption.
+
+```toml
+[tool.spyglass]
+docstring_style    = "google"   # settles the convention; stops it being asked about
+complexity_budget  = 15         # target for new functions, and the measuring threshold
+max_function_lines = 40
+max_class_lines    = 200
+auto               = false      # run unattended by default
+exclude            = ["migrations/**", "vendor/**"]
+```
+
+Put it in your `pyproject.toml`, or in a `.spyglass.toml` beside it. Every key is optional, unknown keys are ignored, and **Spyglass never writes this file** — what you say in a session always wins over it anyway.
 
 ## Where artefacts go
 

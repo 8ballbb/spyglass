@@ -560,6 +560,57 @@ expect("still asking the unanswerable one passes",
 ploughed, _ = h.harvest(stream(text("All decided. Here is the plan.")))
 expect("asking nothing at all fails", h.check_auto_still_stopped(ploughed, _c).ok, False)
 
+
+print("\n── config, audit, and the compounding log ──────────────────────────────")
+
+print("\ncheck_honoured_config")
+settled, _ = h.harvest(stream(text("Using NumPy docstrings throughout, per your settings.")))
+expect("using the configured style passes", h.check_honoured_config(settled, None).ok, True)
+asked, _ = h.harvest(stream(text(
+    "The files disagree — Google in timeutils, NumPy in report. Which docstring style?")))
+expect("asking anyway fails", h.check_honoured_config(asked, None).ok, False)
+mute, _ = h.harvest(stream(text("Here's the plan.")))
+expect("ignoring it entirely fails", h.check_honoured_config(mute, None).ok, False)
+
+print("\ncheck_used_configured_budget")
+cfg, _ = h.harvest(stream(text("Budget for this function: cognitive complexity under 12.")))
+expect("the configured budget passes", h.check_used_configured_budget(cfg, None).ok, True)
+dflt, _ = h.harvest(stream(text("Budget: complexity under 15.")))
+expect("the default overriding the config fails",
+       h.check_used_configured_budget(dflt, None).ok, False)
+
+print("\ncheck_audit_findings")
+audited = h.harvest(stream(
+    tool("Agent", subagent_type="spyglass:pattern-analyzer", prompt="x"),
+    tool("Agent", subagent_type="spyglass:complexity-assessor", prompt="y"),
+    text("load_records scores 28; ReportBuilder is near the size limit.")))[0]
+expect("reaching the planted problems passes", h.check_audit_findings(audited, None).ok, True)
+thin = h.harvest(stream(
+    tool("Agent", subagent_type="spyglass:pattern-analyzer", prompt="x"),
+    text("Nothing much to report.")))[0]
+expect("one assessor is not an audit", h.check_audit_findings(thin, None).ok, False)
+missed = h.harvest(stream(
+    tool("Agent", subagent_type="spyglass:pattern-analyzer", prompt="x"),
+    tool("Agent", subagent_type="spyglass:complexity-assessor", prompt="y"),
+    text("Everything looks tidy.")))[0]
+expect("assessing without reaching either problem fails",
+       h.check_audit_findings(missed, None).ok, False)
+
+print("\ncheck_audit_bounded")
+short, _ = h.harvest(stream(text("- one\n- two\n- three")))
+expect("a finishable backlog passes", h.check_audit_bounded(short, None).ok, True)
+dump, _ = h.harvest(stream(text("\n".join(f"- finding {i}" for i in range(80)))))
+expect("an unbounded dump fails", h.check_audit_bounded(dump, None).ok, False)
+
+print("\ncheck_logged_conformance")
+logged = with_files({"conformance-log.md":
+    "# Conformance log\n\n| Date | Feature | Symbol | Finding |\n|--|--|--|--|\n"
+    "| 2026-08-24 | dates | normalise_date | signature-drift |"})
+expect("a logged finding passes", h.check_logged_conformance(logged, None).ok, True)
+empty_log = with_files({"conformance-log.md": "# Conformance log\n\n| Date |\n|--|"})
+expect("a log with no findings fails", h.check_logged_conformance(empty_log, None).ok, False)
+expect("no log at all fails", h.check_logged_conformance(with_files(FULL), None).ok, False)
+
 print()
 if failures:
     print(f"{len(failures)} harness self-test(s) failed — fix before spending a run.")

@@ -23,6 +23,7 @@ Structured design analysis before any Python implementation. It prevents reimple
 | `--complete <slug>` | Mark a feature complete and write its summary |
 | `--verify <slug>` | Check implemented code against the plan it came from |
 | `--auto` | Run to completion, taking the default at every checkpoint that has one |
+| `--audit <path>` | Assess existing code and return a prioritised backlog, with no task |
 
 Scope: Python projects only.
 
@@ -84,6 +85,47 @@ Do not explain the self-ignoring mechanism, and do not volunteer that their `.gi
 - **Never read, create, or modify the project's root `.gitignore`.** It is tracked, shared, often governed by team policy, and in a monorepo the wrong one is easy to pick. Spyglass ships to strangers; it leaves their files alone.
 - **Do not recreate `.claude/spyglass/.gitignore` if the directory already exists.** A user who deleted it wants these artefacts committed.
 - The self-ignoring `.gitignore` is still written under the `~/.claude/spyglass/` fallback, since `~/.claude/` is occasionally kept under version control.
+
+## Project Configuration
+
+Some answers do not change between features. The docstring convention is the same on Tuesday as it was on Monday; so is the complexity budget and the list of directories nobody wants touched. Asking every run turns a settled matter into a recurring interruption, and interruptions that carry no decision are how the ones that matter get waved through.
+
+**Read once, in Phase 1.** Look for `[tool.spyglass]` in the `pyproject.toml` that resolved the artefact directory. If there is no `pyproject.toml`, look for `.spyglass.toml` beside it. Absent either, everything below falls back to its default and nothing is mentioned.
+
+```toml
+[tool.spyglass]
+docstring_style   = "google"      # google | numpy | sphinx — settles Phase 3
+complexity_budget = 15            # cognitive complexity target for new functions
+max_function_lines = 40           # Phase 7's soft limit
+max_class_lines   = 200           # Phase 7's limit, and signal S3's threshold
+auto              = false         # run unattended by default
+exclude           = ["migrations/**", "vendor/**"]
+```
+
+Every key is optional. An unrecognised key is ignored in silence — a config written against a later version must not break an earlier one.
+
+**What it settles:**
+
+| Key | Effect |
+|---|---|
+| `docstring_style` | Phase 3 reports it as established rather than inferring, and never raises **S4** for docstrings. A project that has decided does not have an inconsistency, it has a migration |
+| `complexity_budget` | The default budget Phase 4b records, and the threshold Phase 8 measures against |
+| `max_function_lines`, `max_class_lines` | Phase 7's limits, and S3's threshold |
+| `auto` | `--auto` behaviour without typing it. `--no-auto` in the invocation overrides it |
+| `exclude` | Paths the searchers, pattern analysis and audit skip entirely |
+
+**Precedence, highest first:**
+
+1. What the user says in this session — always
+2. `[tool.spyglass]` / `.spyglass.toml`
+3. What Phase 3 infers from the code
+4. The defaults above
+
+**Never write this file.** It is the user's, it is tracked, and a plugin that edits a project's config produces an unexpected diff in someone's next commit — the same reason the root `.gitignore` is left alone. If a session establishes something worth making permanent, say so in one line at Phase 12 and let them add it:
+
+> You've now told me twice that this project uses NumPy docstrings. Worth putting `docstring_style = "numpy"` under `[tool.spyglass]` in `pyproject.toml` so I stop asking.
+
+**Mention the config once, on the first run that finds one** — "using the settings in `pyproject.toml`" — and never again. Do not list what it contains; they wrote it.
 
 ## Fast-path
 
@@ -150,6 +192,8 @@ Phase 12 — Handoff                 [Required]    Present artefacts, choose nex
 Separate flows, no design phases:
   --complete <slug>   draft summary → confirm → write, mark complete
   --verify <slug>     conformance-checker → HIL-11: plan vs code, decide which is right
+  --audit <path>      pattern + complexity + style over real code, refactor-assessor
+                      → HIL-12: prioritised backlog, optionally start on one
 ```
 
 **The numbering is not an error.** Phase numbers label design concerns, not execution positions. Phases 2 and 4 are each split because their halves belong at different points: scope needs a plan to judge (2a/2b), and pattern analysis needs a module design to target but must precede contract design (4a/4b).
@@ -162,7 +206,7 @@ Separate flows, no design phases:
 
 ### Phase 1 — Context Check — Required
 
-No agent; main instance. Resolve the artefact directory (above), then: (1) read `PLANS_INDEX.md` if present, noting its absence otherwise; (2) identify feature folders semantically related to the current task — reason about relevance rather than matching strings; (3) for each, read `INDEX.md` to surface pending sub-tasks, session context, and deferred refactors; (4) read `decisions.md` if present — the project's standing conclusions, which shape the reuse investigation later and occasionally answer the task outright; (5) detect orphaned state (see Orphaned State Recovery), surfacing it at HIL-1 if found; (6) generate the slug — lowercase, hyphens for spaces, stop words stripped, max 30 characters. Stop words are the grammatical filler only — articles, prepositions, conjunctions, and auxiliary verbs (`a`, `the`, `to`, `for`, `of`, `in`, `and`, `add`). Nouns that carry meaning are kept, even when the result is well under the cap: "Add CSV export to data pipeline" → `csv-export-data-pipeline`.
+No agent; main instance. Resolve the artefact directory (above), then: (1) read `PLANS_INDEX.md` if present, noting its absence otherwise; (2) identify feature folders semantically related to the current task — reason about relevance rather than matching strings; (3) for each, read `INDEX.md` to surface pending sub-tasks, session context, and deferred refactors; (4) read `[tool.spyglass]` / `.spyglass.toml` if present (see Project Configuration); (5) read `decisions.md` if present — the project's standing conclusions, which shape the reuse investigation later and occasionally answer the task outright; (6) detect orphaned state (see Orphaned State Recovery), surfacing it at HIL-1 if found; (7) generate the slug — lowercase, hyphens for spaces, stop words stripped, max 30 characters. Stop words are the grammatical filler only — articles, prepositions, conjunctions, and auxiliary verbs (`a`, `the`, `to`, `for`, `of`, `in`, `and`, `add`). Nouns that carry meaning are kept, even when the result is well under the cap: "Add CSV export to data pipeline" → `csv-export-data-pipeline`.
 
 → batched into **HIL-1**
 
@@ -216,6 +260,8 @@ Plus class skeletons with `__init__`, public methods, and `@property` definition
 **Record a complexity budget for each planned function.** In the *Signatures* section, note the cognitive complexity you expect it to land under — 15 unless the function has a stated reason to be denser, in which case say the reason. This costs one number per function and converts an observation into a commitment: Phase 8 measures what already exists, and nothing else in this flow says what the new code is *supposed* to cost. `--verify` checks the built code against these later.
 
 Budgets are targets, not gates. Nothing here blocks on one, and a function that lands over budget for a good reason is a conversation, not a defect.
+
+**Read `conformance-log.md` before finalising the contracts.** Where the same kind of drift has been recorded **three or more times**, raise it once, as an observation rather than a rule — designs that consistently understate their parameters keep doing so until someone notices the pattern. Two occurrences is a coincidence; say nothing.
 
 **Use these exact headings in the file. Do not write "Level 1", "Level 2", or "Level 3" anywhere in it:**
 
@@ -365,7 +411,7 @@ Refactor assessment is not something the user has to ask for. Watch for four sig
 |---|---|---|
 | **S1 — Complexity in the change path** | Phase 8 | A function being modified exceeds the threshold of whichever tool measured it — cognitive complexity above 15 (complexipy), or grade C or worse (radon, cyclomatic above 10) |
 | **S2 — Near-duplicate existing code** | Phase 6 | The synthesiser recommends `partial-use` against **priority-1 codebase code** — existing code does most of the job, so unifying may beat building alongside it |
-| **S3 — Plan pushes existing code over a limit** | Phase 4b + Phase 7 | The plan would take an existing class past 200 lines, or give a module a second distinct responsibility |
+| **S3 — Plan pushes existing code over a limit** | Phase 4b + Phase 7 | The plan would take an existing class past `max_class_lines` (200 if unset), or give a module a second distinct responsibility |
 | **S4 — Inconsistent patterns in the target area** | Phase 3 | The pattern analyser reports `inconsistent` for any pattern in the directories being touched — new code cannot follow a convention that does not exist |
 
 **`S1`–`S4` are internal identifiers and never appear in a message to the user — including to report that one did *not* fire.** A signal that stayed quiet is not news; it is the machinery working, and narrating it is the leak that has now happened twice. "S1 doesn't fire — `normalise_date` is simple (grade A)" says nothing the user needs and names two things they have never heard of. Either say what was found — "the function you're touching is straightforward, so nothing to restructure there" — or, far better, say nothing and move on.
@@ -563,6 +609,35 @@ Note which option comes first. Doing nothing is the cheapest outcome available, 
 
 Folder layout, both status vocabularies, the `PLANS_INDEX.md` and `INDEX.md` templates, **the headings `pseudocode.md` must use**, the single-session success path, `session-context.md` contents, and the `user_overrides` entry format are all specified in `artefact-formats.md`, a sibling of this file. **Read it before writing anything in Phase 11**, and when reading prior artefacts in Phase 1.
 
+## `--audit` Flow
+
+**Trigger:** `--audit <path>`. No design phases, no task.
+
+Every other flow needs a task before it is any use, which means Spyglass is worth nothing until you are already about to write something. `--audit` points the assessment agents at code that exists and asks what is wrong with it, producing a backlog rather than a plan.
+
+1. Resolve the artefact directory as usual. Honour `exclude` from the project configuration
+2. **Dispatch three agents in one response**, concurrently:
+   - `spyglass:pattern-analyzer` over the target path — what conventions hold, and where they break down
+   - `spyglass:complexity-assessor` over every Python file under it — pass `audit_mode: true`, because there is no change path here and **everything measured is in scope**
+   - `spyglass:style-checker` with `source_mode: true` — reviewing real files rather than a plan
+3. Every finding raises its usual signal. Dispatch `spyglass:refactor-assessor` with all of them
+4. Write `<artefact-dir>/audits/<yyyy-mm-dd>.md` after **HIL-12** confirms
+5. Offer to turn any finding into a design task — `/spyglass:spyglass <the finding>` — which is how an audit becomes work rather than a document
+
+**Order findings by what they cost to live with, not by severity label.** A grade-F function nobody touches matters less than a grade-C one in the middle of everything, and an audit that leads with the worst score rather than the worst problem gets read once.
+
+**An audit is not a to-do list.** Existing code that works is not defective for being unfashionable. Report what is measurably costly — complexity in code that changes often, conventions that genuinely conflict, classes past the size limit — and leave taste alone. The fastest way to make this feature worthless is to return forty findings.
+
+**Cap at 15 findings.** Beyond that, report the count omitted and the worst offenders only. A backlog nobody can finish is a backlog nobody starts.
+
+### HIL-12 — Audit findings *(only in the `--audit` flow)*
+
+**Present:** a one-line summary — files scanned, findings worth acting on — then the findings in cost order. Say plainly when there is nothing worth reporting; a clean audit is a real and useful result.
+
+**Ask:** whether to write the report, and whether to start on any finding now.
+
+**Wait for:** confirmation before writing anything.
+
 ## `--verify` Flow
 
 **Trigger:** `--verify <feature-slug>`. No design phases run.
@@ -573,6 +648,7 @@ This is the only place the design-first claim is tested. Everything else in this
 2. Dispatch **`spyglass:conformance-checker`** with the absolute plan path and any complexity budgets the plan recorded
 3. Present its findings → **HIL-11**
 4. On the user's decision, update `session-context.md` with what was accepted and why. Never edit their code
+5. **Append each finding to `conformance-log.md`** with how it was resolved. One drift is noise; the same drift four times is a fact about how this project designs, and Phase 4b reads it back
 
 **Drift is information, not a verdict.** Implementation legitimately discovers what design could not — an edge case needing another parameter, a return type that was wrong on paper. The useful question is *which* to correct: the plan or the code. Ask it that way. A run that reports drift as failure teaches people to stop running it.
 

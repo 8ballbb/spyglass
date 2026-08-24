@@ -3,7 +3,8 @@
 #
 # WHY THIS EXISTS
 #
-# Phase 8 measures with radon or complexipy when they are present, and falls
+# Phase 8 measures with radon or complexipy when they are present, and --verify
+# type-checks with mypy when it is, and falls
 # back to reading the code by eye when they are not. Neither is installed on a
 # stock machine, so every complexity assertion in this suite has so far
 # exercised the fallback. The measured path — the one the phase is actually
@@ -22,10 +23,11 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV="$REPO/tests/.tools-venv"
 
 if [ "${1:-}" = "--check" ]; then
-    if [ -x "$VENV/bin/radon" ] && [ -x "$VENV/bin/complexipy" ]; then
+    if [ -x "$VENV/bin/radon" ] && [ -x "$VENV/bin/complexipy" ] && [ -x "$VENV/bin/mypy" ]; then
         echo "measured path available:"
         "$VENV/bin/radon" --version | sed 's/^/  /'
         "$VENV/bin/complexipy" --version 2>/dev/null | sed 's/^/  complexipy /' || true
+        "$VENV/bin/mypy" --version | sed 's/^/  /'
         exit 0
     fi
     echo "not installed — runs will exercise the by-eye fallback only" >&2
@@ -34,7 +36,7 @@ fi
 
 python3 -m venv "$VENV"
 "$VENV/bin/pip" install --quiet --upgrade pip
-"$VENV/bin/pip" install --quiet radon complexipy
+"$VENV/bin/pip" install --quiet radon complexipy mypy
 echo "Installed into tests/.tools-venv:"
 "$VENV/bin/radon" --version | sed 's/^/  /'
 echo "  complexipy $("$VENV/bin/complexipy" --version 2>/dev/null || echo installed)"

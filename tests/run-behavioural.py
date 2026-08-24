@@ -821,6 +821,97 @@ def check_named_the_drift(t: "Transcript", _) -> Result:
                   "" if named else "reported drift without naming which parameters differ")
 
 
+SPYGLASS_CONFIG = """
+[tool.spyglass]
+docstring_style   = "numpy"
+complexity_budget = 12
+max_class_lines   = 150
+"""
+
+
+def plant_config(cwd: Path) -> None:
+    """Append a [tool.spyglass] block to the fixture's pyproject.toml.
+
+    Reset restores the file from git afterwards, so this does not leak between
+    cases — but the fixture is real test data, so it is appended rather than
+    rewritten.
+    """
+    pp = cwd / "pyproject.toml"
+    if "[tool.spyglass]" not in pp.read_text():
+        pp.write_text(pp.read_text().rstrip() + "\n" + SPYGLASS_CONFIG)
+
+
+def check_honoured_config(t: "Transcript", _) -> Result:
+    """A configured convention is settled, and settling it must be visible.
+
+    The fixture has three docstring styles and the plugin asks about them every
+    run. With `docstring_style = "numpy"` set, it must use NumPy and stop
+    asking — a config that changes nothing observable is a config nobody trusts.
+    """
+    asked = re.search(r"which docstring|docstring style.{0,40}\?|"
+                      r"(google|numpy).{0,60}(google|numpy).{0,40}\?",
+                      t.visible, re.I)
+    if asked:
+        return Result("honoured the configured convention", False,
+                      "asked about docstring style despite the project having set it")
+    used = re.search(r"numpy", t.full, re.I)
+    return Result("honoured the configured convention", bool(used),
+                  "" if used else "never mentioned the configured style at all")
+
+
+def check_used_configured_budget(t: "Transcript", _) -> Result:
+    """12, not 15. A default that ignores the config is not a config."""
+    if re.search(r"\b15\b[^.\n]{0,40}(budget|threshold|complexity)|"
+                 r"(budget|threshold)[^.\n]{0,20}\b15\b", t.full, re.I):
+        return Result("used the configured budget", False,
+                      "used the default 15 despite complexity_budget = 12")
+    used = re.search(r"\b12\b", t.full)
+    return Result("used the configured budget", bool(used),
+                  "" if used else "no sign of the configured budget anywhere")
+
+
+def check_audit_findings(t: "Transcript", _) -> Result:
+    """An audit must reach the planted problems, and it must be bounded.
+
+    P2 is a complexity-14 function; P5 is a class near the size limit. Both sit
+    under the audited path, so an audit that finds neither has not looked.
+    """
+    agents = [a for a in ("pattern-analyzer", "complexity-assessor", "style-checker")
+              if a in t.full]
+    if len(agents) < 2:
+        return Result("audited the real code", False,
+                      "dispatched " + (", ".join(agents) or "nothing"))
+    found = re.search(r"load_records|ReportBuilder", t.full)
+    return Result("audited the real code", bool(found),
+                  f"dispatched {len(agents)} assessors" if found
+                  else "assessed the path without reaching either planted problem")
+
+
+def check_audit_bounded(t: "Transcript", _) -> Result:
+    """A backlog nobody can finish is a backlog nobody starts.
+
+    The cap is 15. This counts numbered or bulleted findings in what the user
+    saw — a rough measure, deliberately generous, and it only fails a genuinely
+    unbounded dump.
+    """
+    lines = [l for l in t.visible.splitlines()
+             if re.match(r"\s*(?:[-*]|\d+\.)\s+\S", l)]
+    ok = len(lines) <= 60
+    return Result("kept the backlog finishable", ok,
+                  f"{len(lines)} bulleted lines shown" if not ok else "")
+
+
+def check_logged_conformance(t: "Transcript", _) -> Result:
+    """The one artefact that compounds is only useful if it is written."""
+    have = [k for k in t.files if k.split("/")[-1] == "conformance-log.md"]
+    if not have:
+        return Result("logged the conformance finding", False, "no conformance-log.md")
+    body = "\n".join(t.files[k] for k in have)
+    rows = len([l for l in body.splitlines() if l.strip().startswith("|")])
+    return Result("logged the conformance finding", rows > 2,
+                  "" if rows > 2 else "the log exists but holds no findings")
+
+
 # ── cases ─────────────────────────────────────────────────────────────────────
 
 CASES = [
@@ -1359,6 +1450,51 @@ CASES = [
             check_no_jargon,
             check_auto_still_stopped,
             check_auto_reported_decisions,
+            check_no_implementation,
+        ],
+    ),
+    Case(
+        name="config",
+        description="A configured convention is settled — it must be used, and "
+                    "must stop being asked about.",
+        setup_fs=plant_config,
+        prompt="/spyglass:spyglass add a function that formats a currency amount",
+        turns=[
+            "Yes, that name and size are fine. Take a float and a three-letter "
+            "currency code, return a string like '1,234.50 EUR'.",
+            "The plan looks right. Continue.",
+            *CARRY_ON,
+        ],
+        checks=[
+            check_no_jargon,
+            check_honoured_config,
+            check_used_configured_budget,
+            check_no_implementation,
+        ],
+    ),
+    Case(
+        name="audit",
+        description="Pointed at existing code with no task, it must find the "
+                    "real problems and return a backlog someone could finish.",
+        prompt="/spyglass:spyglass --audit src/dataflow",
+        turns=["Yes, write the report. Don't start on anything yet."],
+        checks=[
+            check_no_jargon,
+            check_audit_findings,
+            check_audit_bounded,
+            check_no_implementation,
+        ],
+    ),
+    Case(
+        name="conformance-log",
+        description="A verify finding must reach the project-wide log, which is "
+                    "the only artefact that compounds.",
+        setup_fs=plant_drifted_plan,
+        prompt=f"/spyglass:spyglass --verify {DRIFT_SLUG}",
+        turns=["The code is right — update the plan to match it."],
+        checks=[
+            check_no_jargon,
+            check_logged_conformance,
             check_no_implementation,
         ],
     ),

@@ -17,7 +17,7 @@ You report how complex the code being modified already is, before more is added 
 
 Run whichever of these is installed, in this order. **Do not reconcile two tools against each other** — take the first that runs and stop. They measure different things, and averaging them produces a number that means nothing.
 
-1. `complexipy --plain --max-complexity-allowed 15 <file>` — cognitive complexity, and the preferred measure
+1. `complexipy --plain --max-complexity-allowed <budget> <file>` — cognitive complexity, and the preferred measure. `<budget>` is the project's configured `complexity_budget`, passed to you by the caller; use 15 when none was given
 2. `radon cc <file> -s` — cyclomatic complexity, graded A–F
 3. Neither installed → read the files and assess by eye. Say in your report that the figures are estimates and that either tool would improve accuracy
 
@@ -25,7 +25,7 @@ Run whichever of these is installed, in this order. **Do not reconcile two tools
 
 - `--plain` prints one space-separated line per function — `<path> <function> <complexity>` — and the tool documents it as the format intended for scripting and agents. Without it you get boxed, coloured, emoji-decorated output that you have to parse for no benefit
 - **Never `-q`.** `--quiet` suppresses the output entirely; the command succeeds and prints nothing, which reads exactly like a file with no functions in it
-- `--max-complexity-allowed 15` pins the threshold. Its default is 15 today, but this plugin runs on machines whose tool versions nobody controls, and a defaulted threshold means the signal quietly changes definition when the tool updates
+- `--max-complexity-allowed` is always passed explicitly. The tool's own default is 15 today, but this plugin runs on machines whose tool versions nobody controls, and a defaulted threshold means the signal quietly changes definition when the tool updates — and the project may have chosen a different number
 - The exit code is **1 when any function exceeds the threshold**, 0 when none do. Useful as a check, but always read the numbers — the exit code cannot tell you *which* function, and only functions in the change path matter
 
 **Never prompt the user to install anything.** Environment setup is not this plugin's business.
@@ -34,13 +34,19 @@ Then add what the tool does not tell you: which specific functions the current c
 
 The tool is the measurement. You are the interpretation. Do not restate its output — explain what it means for this change.
 
+## Audit mode
+
+When the caller passes `audit_mode: true` there is no change path — nothing is being modified, so **every function you measure is in scope**. Report the whole distribution, worst first, and say how many functions were measured so a single bad score is read in proportion.
+
+Say nothing about signals in this mode; there is no plan for them to fire against. The caller decides what to do with the numbers.
+
 ## Signal S1
 
 A function **in the change path** raises **S1** when it exceeds the threshold of whichever tool you used:
 
 | Measured with | Raises S1 at |
 |---|---|
-| complexipy | cognitive complexity **above 15** — its own default, which it reports as `FAILED` |
+| complexipy | cognitive complexity **above the budget you were given**, 15 if none — reported as `FAILED` |
 | radon | grade **C or worse** — cyclomatic complexity above 10 |
 | by eye | deep nesting or long branch chains that clearly exceed the above |
 

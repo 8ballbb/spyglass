@@ -9,6 +9,9 @@ Reference for the spyglass skill. Read when writing artefacts in Phase 11, or wh
 ├── .gitignore                       # contains "*" — makes this tree invisible to git
 ├── PLANS_INDEX.md
 ├── decisions.md                     # project-wide; survives individual features
+├── conformance-log.md               # one row per --verify finding; the only file that compounds
+├── audits/
+│   └── <yyyy-mm-dd>.md              # --audit reports
 └── <feature-slug>/
     ├── INDEX.md
     ├── pseudocode.md
@@ -88,6 +91,29 @@ Everything else here is scoped to one feature, so each new feature re-derives co
 **Consult it in Phase 5, before dispatching the searchers.** A prior rejection is a strong prior, not a rule: cite it, say when it was made, and re-check anything that turns on a fact that may have changed — an uninstalled package may since have been installed. Never treat an old decision as closing a question the user has just reopened by asking.
 
 **Never rewrite or delete an entry.** Superseding one means adding a new row that says so. The value here is the reasoning trail, and a trail that gets tidied is just the current state with extra steps.
+
+## `conformance-log.md`
+
+One row per `--verify` finding, appended after HIL-11. Project-wide.
+
+```markdown
+# Conformance log
+
+| Date | Feature | Symbol | Finding | Resolved by |
+|------|---------|--------|---------|-------------|
+| 2026-08-24 | date-normalisation | normalise_date | signature-drift: planned `tz: str`, built `assume_utc: bool` | updated the plan |
+| 2026-08-24 | csv-export | write_rows | missing | left flagged |
+```
+
+**This is the only artefact that gets more useful the more there is of it.** Everything else is read within the feature that wrote it and then rarely again. A single drift is noise; the same drift four times is a fact about how this project designs.
+
+**Read it in Phase 4b, and act only on repetition.** Where the same finding type has occurred **three or more times**, say so once while designing the thing likely to repeat it:
+
+> Three of the last five plans here understated their parameters — an `errors` or `encoding` argument turned up during implementation. Worth deciding now whether this one needs it.
+
+**Three, not two.** Two is a coincidence, and a design pass that lectures on the strength of two data points is worse than one that says nothing. Never present a pattern as a rule: it describes what has happened, not what must.
+
+**Never rewrite rows.** As with `decisions.md`, the value is the trail.
 
 ## `<feature>/pseudocode.md`
 

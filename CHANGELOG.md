@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.3.0 — 2026-08-24
+
+### Added
+
+- **`--verify <slug>`** — compares implemented code against the plan it came
+  from. Signatures are parsed rather than read by eye, complexity is measured
+  against the budget the plan set, and `mypy` is used where installed to check
+  the types a contract stated actually hold. Drift is reported as a question,
+  not a verdict: implementation legitimately discovers what design could not, so
+  updating the plan is a valid answer.
+- **`--audit <path>`** — assess code that already exists, with no task. Returns
+  a prioritised backlog ordered by what each finding costs to live with rather
+  than by severity label, capped at fifteen. Everything else here needs a task
+  before it is any use.
+- **`--auto`** — run to completion, taking the default at every checkpoint
+  except two: a genuinely ambiguous request, and a hard style violation. Every
+  decision taken is reported at the end and recorded as auto-taken rather than
+  user-confirmed.
+- **Complexity budgets.** Plans now record what each new function is meant to
+  cost, so `--verify` can check what it does. A threshold agreed before the code
+  exists is something no linter can offer.
+- **`[tool.spyglass]` configuration** in `pyproject.toml`, or `.spyglass.toml`.
+  Settles the docstring convention, complexity budget, size limits, and paths to
+  skip. Never written by Spyglass; what you say in a session always wins.
+- **`decisions.md`** — project-level memory. Conclusions that outlive a feature
+  are recorded once instead of re-derived by four agents every time.
+- **`conformance-log.md`** — one row per verify finding. The same drift three
+  times is a fact about how a project designs, and the design phase now reads it
+  back. Two is a coincidence and stays silent.
+
 ## 0.2.0 — 2026-08-20
 
 Behavioural testing found bugs that structural validation could not. Everything

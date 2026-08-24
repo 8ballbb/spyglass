@@ -66,7 +66,18 @@ for p in "${PARTS[@]}"; do
     cp -R "$REPO/$p" "$CACHE/$p"
 done
 
-echo "Synced working tree → $(basename "$CACHE")"
+# The cache directory is named for the version that was installed, not the
+# version in the working tree. They diverge the moment plugin.json is bumped,
+# and a run still tests the synced files — but silently reporting the old number
+# looks like the sync went to the wrong place.
+TREE_VERSION="$(python3 -c "import json;print(json.load(open('$REPO/.claude-plugin/plugin.json'))['version'])" 2>/dev/null || echo '?')"
+CACHE_VERSION="$(basename "$CACHE")"
+if [ "$TREE_VERSION" != "$CACHE_VERSION" ]; then
+    echo "Synced working tree (v$TREE_VERSION) → cache dir v$CACHE_VERSION"
+    echo "  (the directory keeps its installed name until you reinstall; the files are current)"
+else
+    echo "Synced working tree → $CACHE_VERSION"
+fi
 for p in "${PARTS[@]}"; do
     printf '  %s\n' "$p"
 done

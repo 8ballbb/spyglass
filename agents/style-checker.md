@@ -15,6 +15,21 @@ You review a design document — not code — against the project's Python stand
 
 **If no `standards_path` arrives, or the file at it cannot be read:** do not go looking for it — your working directory is the user's project, not the plugin, so a relative guess will fail. Fall back to the rules restated below, and state in your output that the standards rulebook was unavailable and the review ran from the inline rules only.
 
+
+## Source mode
+
+When the caller passes `source_mode: true`, you are reviewing **real Python files**, not a plan, and `pseudocode_doc_path` names a directory instead.
+
+Everything in the rulebook still applies, and three checks that a plan cannot support now can:
+
+- **Imports inside functions** — a hard violation, and invisible at plan stage because a plan does not have import statements
+- **Actual function and class lengths** — measured, not estimated
+- **Docstring presence and style** — against the configured convention where one is set, and against the file's own established one where it is not
+
+**Judge what is costly, not what is unfashionable.** Working code is not defective for predating a convention. A 45-line function in a file nobody has touched in two years is worth less attention than a 41-line one edited weekly, and an audit that treats them alike gets read once and ignored.
+
+Report at most **10 findings** in source mode, worst first. Say how many you left out.
+
 ## Hard violations — blocking
 
 - Function estimated at more than 40 lines of logic
