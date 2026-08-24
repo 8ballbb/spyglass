@@ -147,6 +147,20 @@ The third set covers the features added after the first round of testing.
 | `budget` | A plan records what its new functions are meant to cost | — |
 | `decisions` | Conclusions that outlive a feature reach the project-wide record | P4 |
 | `auto` | Unattended, it still refuses to guess what was meant, and says what it decided alone | P1 |
+| `config` | A configured convention is used and stops being asked about | P3 |
+| `audit` | Pointed at existing code with no task, it finds the real problems and bounds the backlog | P2, P5 |
+| `conformance-log` | A verify finding reaches the project-wide log | — |
+
+`config` and `audit` both plant state rather than converse. `config` appends a
+`[tool.spyglass]` block to the fixture's `pyproject.toml` — reset restores it
+from git afterwards, so it cannot leak between cases. `audit` needs no setup at
+all: P2 and P5 are already the problems it should find.
+
+`verify` plants a *drifted plan* rather than running a design conversation. An
+earlier version ran the full seven-turn setup and then verified it — but nothing
+had been implemented, so the check found a missing function rather than a
+disagreement, and the assertion that matters most never fired. Planting a plan
+that describes real code wrongly is both a better test and a much cheaper one.
 
 `auto` is the one to watch. `--auto` exists to remove checkpoints, and the case
 asks for something deliberately underspecified — so it passes only if the mode

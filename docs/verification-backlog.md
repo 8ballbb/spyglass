@@ -39,29 +39,41 @@ the most common path, in a message the user reads.
 
 ---
 
-## P2 — `oversized-module` has never been graded
+## Resolved since this list was written
 
-The only one of the twenty-one cases with no result. Six attempts: five killed
-by the session limit, one by a turn budget three phases short of the assertion.
+- **`oversized-module`** — graded at last, 3/3. Seven attempts; the fix was the
+  harness, not the case. Signal S3 is verified.
+- **`force-tests`** — 4/4, including the `test-plan.md` assertion that had never
+  run.
+- **The abort-and-restart cycle** — runs now save progress after every turn and
+  resume where they stopped, and an abort is detected on the turn it happens
+  rather than after the whole list has fired at a dead session. `auto` has
+  already advanced across two separate quota windows this way.
 
-It is the sole test of **S3** — a plan that would push an existing class past
-the 200-line limit. In its one graded attempt the plugin did detect the problem
-twice, unprompted, before the script ran out; so this is a coverage gap rather
-than a suspected bug.
+## P2 — Six features are implemented and unverified
 
-**How to verify:** `--case oversized-module`, when the quota is fresh. It is the
-most expensive case in the suite — nine turns of standard flow — which is
-exactly why it keeps colliding with the limit. Seven attempts now; the last two
-both died at checkpoint 8 of 8, one step from being graded.
+`--verify` is confirmed (6/6, against planted signature drift). The rest have
+never been observed in a real run:
 
-**Also unverified for the same reason:** `force-tests`, whose new
-`check_test_plan_written` assertion has never run — it aborted at checkpoint 7
-of 7. Both are long standard-flow cases, and both should be run first when the
-quota is fresh rather than last.
+| Feature | Case | Status |
+|---|---|---|
+| Complexity budgets | `budget` | never run |
+| `decisions.md` | `decisions` | never run |
+| `--auto` | `auto` | 2 of 6 checkpoints, twice interrupted |
+| `[tool.spyglass]` | `config` | never run |
+| `--audit` | `audit` | never run |
+| `conformance-log.md` | `conformance-log` | never run |
 
----
+Graders for all of them are proven in both directions in the self-test, which
+establishes that the checks work and nothing about whether the features do.
 
-## P2 — `--suggest-refactors` output is verified once, on one function
+**`audit` is the one to run first.** It is a new flow rather than an addition to
+an existing one, it dispatches three agents in modes they have never been asked
+for, and two of those modes — the style checker reading source, the complexity
+assessor with no change path — are new instructions on old agents. That is the
+largest untested surface of anything here.
+
+## P2 — `--suggest-refactors` output is verified once, on one function## P2 — `--suggest-refactors` output is verified once, on one function
 
 Working, and better than specified: a run reasoned against the tool's own plans,
 recommending a different fix because *"complexipy's own two suggestions only
