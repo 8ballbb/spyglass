@@ -2,6 +2,15 @@
 
 ## 0.3.0 — 2026-08-24
 
+### Fixed
+
+- **A vague answer at the final checkpoint no longer authorises writing code.**
+  Asked "implement now, hand off, or stop here?" and answered "yes, that all
+  looks right, continue", Spyglass wrote two files and edited a third. A generic
+  affirmation selects none of three options, and this is the only checkpoint
+  where guessing wrong puts a diff in your repository rather than a sentence in
+  a document. It now asks again, and defaults to stopping.
+
 ### Added
 
 - **`--verify <slug>`** — compares implemented code against the plan it came

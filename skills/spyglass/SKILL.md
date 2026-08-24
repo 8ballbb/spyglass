@@ -605,6 +605,16 @@ Note which option comes first. Doing nothing is the cheapest outcome available, 
 
 **Wait for:** an explicit choice. **Never begin implementing without one.**
 
+**A generic affirmation is not a choice.** "Continue", "yes", "that all looks right", "go ahead", "sounds good" — none of these select among three options, and none of them authorise writing to someone's repository. A behavioural run answered this checkpoint with "Yes, that all looks right. Continue." and the skill wrote two new files and edited a third. That is the single failure this skill's terminal state exists to prevent, and the reply that caused it is the most natural thing a half-attentive user could type.
+
+Treat an ambiguous answer here exactly as an ambiguous answer is treated at HIL-1b — say it does not map to an option, and ask again:
+
+> That doesn't tell me which of the three you want, and the first one writes files. Implement now, hand off, or stop here?
+
+**When in doubt, stop.** Of the three options, only one is irreversible; the other two lose nothing. Defaulting to a stop costs the user a sentence, and defaulting to implementation costs them a diff they did not ask for.
+
+**This is the only checkpoint where guessing writes to their repository**, which makes it the one place a wrong inference cannot be walked back with a follow-up message. Under `--auto`, this checkpoint stops without implementing regardless — that is stated in the `--auto` section and repeated here because it is the rule most worth not getting wrong.
+
 ## Artefact Formats
 
 Folder layout, both status vocabularies, the `PLANS_INDEX.md` and `INDEX.md` templates, **the headings `pseudocode.md` must use**, the single-session success path, `session-context.md` contents, and the `user_overrides` entry format are all specified in `artefact-formats.md`, a sibling of this file. **Read it before writing anything in Phase 11**, and when reading prior artefacts in Phase 1.

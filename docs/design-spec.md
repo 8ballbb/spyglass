@@ -558,6 +558,18 @@ Every other artefact is read within the feature that wrote it. This one is the o
 
 The conformance checker states its own limit plainly — behaviour is not visible in a signature. mypy closes part of that gap: contracts state types, and mypy checks whether they hold at the call sites, which neither grep nor `ast` can do. Same optional-tool pattern as complexipy: used when present, never prompted for, silently skipped otherwise. Only errors touching planned symbols are reported, since a project's pre-existing type debt is not this feature's drift.
 
+## The handoff checkpoint, and the one guess that cannot be walked back
+
+Behavioural testing found the skill writing implementation code into the fixture: two new files and an edit to a third. It had presented HIL-10 correctly — implement now, hand off, or stop here — and the reply was *"Yes, that all looks right. Continue."*
+
+That reply selects nothing. The skill inferred the first option, which is the one the terminal state exists to prevent, and it is also the most natural thing a half-attentive user could type after nine checkpoints of saying continue.
+
+What makes this the sharpest failure in the flow is the asymmetry. Every other checkpoint that guesses wrong produces a document the user can correct in one message. This one produces a diff in their repository. And the skill already refuses precisely this ambiguity at HIL-1b, where it will say plainly that "Continue" does not map to any of the options and ask again — so the behaviour existed, it just was not applied at the checkpoint where the stakes are highest.
+
+HIL-10 now states that a generic affirmation is not a choice, gives the words to re-ask with, and says that when in doubt the answer is to stop: of the three options only one is irreversible, and defaulting to a stop costs a sentence.
+
+**A second finding came out of the same run.** The failure contaminated the two cases after it, because `reset-fixture.sh` restored tracked files with `git checkout` and left untracked ones alone — so `currency.py` sat in the fixture and failed the no-implementation check for cases that had never created it. Reset now runs `git clean` over the fixture as well.
+
 ## Phase Specifications
 
 *Ordered by execution sequence.*

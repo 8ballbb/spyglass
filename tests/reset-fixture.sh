@@ -43,6 +43,17 @@ if ! git -C "$REPO" diff --quiet -- tests/fixtures 2>/dev/null; then
     echo "  restored tests/fixtures (a run had modified it)"
 fi
 
+# checkout restores tracked files and leaves untracked ones where they are. A
+# run that wrote src/dataflow/currency.py therefore left it behind for every
+# case that followed, and the next two both failed the no-implementation check
+# for a file neither of them created.
+untracked=$(git -C "$REPO" ls-files --others --exclude-standard -- tests/fixtures)
+if [ -n "$untracked" ]; then
+    git -C "$REPO" clean -fdq -- tests/fixtures
+    echo "  removed files a run created:"
+    echo "$untracked" | sed 's|^|    |'
+fi
+
 find "$FIXTURE" -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
 
 echo
