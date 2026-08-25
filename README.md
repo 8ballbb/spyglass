@@ -58,7 +58,7 @@ Refactor assessment is **signal-driven by default** — Spyglass watches for fou
 
 ## What a run looks like
 
-**It is interactive.** A full run has twelve phases and ten checkpoints where Spyglass stops and waits for your input — it does not run to completion unattended. Two fast paths skip most of this for small changes.
+**It is interactive.** A full run has twelve phases and ten checkpoints where Spyglass stops and waits for your input — it does not run to completion unattended. Two fast paths skip most of this for small changes, and `--auto` skips all but two of the checkpoints. (`--verify` and `--audit` are separate flows with one checkpoint each.)
 
 ```
 Phase 1  — Context check                          Locate artefacts, detect orphaned state, generate slug
@@ -79,7 +79,7 @@ Phase 11 — Artefact update                          └─ HIL-9: confirm cont
 Phase 12 — Handoff                                  └─ HIL-10: implement now / hand off / stop here
 ```
 
-Cost is proportional to how much of that flow actually runs — most runs use far fewer than eleven agents:
+Cost is proportional to how much of that flow actually runs — most runs use far fewer than the eleven design agents (the twelfth runs only under `--verify`):
 
 | Path | Agents spawned | Which |
 |---|---|---|

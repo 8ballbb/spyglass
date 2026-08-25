@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-12, revised through 2026-08-20
 **Status:** Built, published, and behaviourally tested. This document and the code govern; where they disagree, the code is what runs.
-**Revision:** 8 (behavioural findings folded in; complexipy added alongside radon)
+**Revision:** 9 (conformance checking, audit, auto, project config, complexity budgets, decisions and conformance logs)
 
 ---
 
@@ -97,7 +97,8 @@ spyglass/
 │   ├── style-checker.md
 │   ├── complexity-assessor.md
 │   ├── refactor-assessor.md
-│   └── test-planner.md
+│   ├── test-planner.md
+│   └── conformance-checker.md
 ├── docs/
 │   ├── design-spec.md           # this file
 │   ├── implementation-plan.md   # historical record of the build; not a source of truth
@@ -916,6 +917,12 @@ Referenced as `spyglass:<name>`.
 | `complexity-assessor` | Read, Bash | Phase 8 (conditional) |
 | `refactor-assessor` | Read, Grep | Phase 9 (signal-driven) |
 | `test-planner` | Read, Glob | Phase 10 (conditional) |
+| `conformance-checker` | Read, Grep, Glob, Bash | `--verify` only |
+
+Three agents take a mode flag rather than existing twice. `complexity-assessor`
+runs with `audit_mode` (no change path, so everything measured is in scope) and
+`style-checker` with `source_mode` (reviewing real files rather than a plan,
+which enables three checks a plan cannot support). Both are `--audit`.
 
 ---
 

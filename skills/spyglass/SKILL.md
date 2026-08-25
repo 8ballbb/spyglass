@@ -5,7 +5,7 @@ description: Use when implementing any Python feature, function, class, or modul
 
 # Spyglass
 
-Structured design analysis before any Python implementation. It prevents reimplementing functionality that already exists, ignoring codebase conventions, writing oversized functions and classes, never considering refactoring, and starting tasks too large for one session. Twelve phases, ten human-in-the-loop checkpoints, and a set of persistent artefacts that make a design resumable across sessions.
+Structured design analysis before any Python implementation. It prevents reimplementing functionality that already exists, ignoring codebase conventions, writing oversized functions and classes, never considering refactoring, and starting tasks too large for one session. Twelve phases, ten human-in-the-loop checkpoints, and a set of persistent artefacts that make a design resumable across sessions. Three further flows work on code that already exists: `--verify` checks it against its plan, `--audit` assesses it without a plan, and `--complete` closes a feature out.
 
 **Announce at start, verbatim:**
 

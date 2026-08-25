@@ -66,8 +66,14 @@ Spyglass writes design artefacts into the project it runs against, and a second
 run **resumes from them** rather than starting fresh — correct behaviour, and
 exactly wrong for testing. The script clears artefacts from all three locations
 a run can write to (the fixture, the repo root, and `~/.claude/spyglass` from a
-no-project run), restores the fixture sources in case a run edited them, and
-verifies all five planted conditions are still intact.
+no-project run), restores the fixture sources in case a run edited them, removes
+any files a run created, and verifies all five planted conditions are still
+intact.
+
+Removing untracked files matters more than it sounds. `git checkout` restores
+tracked files and leaves new ones where they are, so a run that wrote
+`src/dataflow/currency.py` left it behind for every case that followed — and the
+next two both failed the no-implementation check for a file neither had created.
 
 It exits non-zero if a plant has gone missing, so a fixture that can no longer
 exercise every check fails loudly instead of passing a weakened test.
@@ -150,6 +156,19 @@ The third set covers the features added after the first round of testing.
 | `config` | A configured convention is used and stops being asked about | P3 |
 | `audit` | Pointed at existing code with no task, it finds the real problems and bounds the backlog | P2, P5 |
 | `conformance-log` | A verify finding reaches the project-wide log | — |
+| `vague-go-ahead` | A generic affirmation at the handoff checkpoint does not authorise writing code | — |
+
+`vague-go-ahead` exists because of a real failure. Asked "implement now, hand
+off, or stop here?", a run was answered "Yes, that all looks right. Continue."
+and wrote two files into the fixture and edited a third. That reply selects
+none of three options, and this is the only checkpoint in the flow where
+guessing wrong puts a diff in someone's repository rather than a sentence in a
+document.
+
+The `config` case is the accidental control for that fix: same case, same
+scripted replies, and it wrote code before the fix and asked again after it —
+*"That doesn't tell me which of the two you want, and one of them writes code to
+your repo."*
 
 `config` and `audit` both plant state rather than converse. `config` appends a
 `[tool.spyglass]` block to the fixture's `pyproject.toml` — reset restores it
