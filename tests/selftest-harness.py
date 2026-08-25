@@ -493,6 +493,23 @@ expect("ordering check still works across a resume",
 h.clear_progress(_case)
 expect("clearing removes it", h.load_progress(_case), None)
 
+# Truncated versus degraded. Only one of these can be resumed.
+truncated, _ = h.harvest(stream(text("Here's the plan. Does the structure look right?")))
+expect("a stopped run is resumable", h.degraded(truncated), False)
+
+# Observed live: the run under test hit the limit internally, its searchers
+# failed to dispatch, and it asked the user how to proceed. Resuming that answers
+# a question about quota recovery, not the one the case was written for.
+adapted, _ = h.harvest(stream(text(
+    "I want to get this right rather than guess — could you just reply with the "
+    "number?\n\n1 = wait for the session limit to reset and retry the automated "
+    "search\n2 = skip the agents, I'll reason through reuse manually\n3 = stop here")))
+expect("a run that adapted to a failure is not resumable", h.degraded(adapted), True)
+
+h.save_progress(_case, "sess-9", 2, adapted, "p", ["one", "two", "three"])
+expect("and load_progress refuses it", h.load_progress(_case), None)
+h.clear_progress(_case)
+
 # A save with no turns answered is not something to resume into.
 h.save_progress(_case, "sess-9", 0, a, "p", ["one"])
 expect("zero turns answered is not resumable", h.load_progress(_case), None)

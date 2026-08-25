@@ -1759,7 +1759,36 @@ def save_progress(case: Case, session: str | None, done: int,
                   for st in t.steps],
         "prompt": prompt,
         "turns": turns,
+        "degraded": degraded(t),
     }, indent=1))
+
+
+# A run can be interrupted in two different ways, and only one of them is
+# resumable.
+#
+#   truncated — the CLI returned a limit error and the conversation simply
+#               stopped. Resuming continues exactly where it was.
+#   degraded  — the run itself hit the limit *internally*: its sub-agents failed
+#               to dispatch, and it adapted, asking the user how to proceed.
+#
+# Resuming a degraded conversation is worse than restarting it. The run is now
+# waiting on an answer to a question about quota recovery, so the scripted turns
+# answer something else entirely, and the case tests nothing it was written for.
+DEGRADED = [
+    r"session limit.{0,80}(reset|retry|wait)",
+    r"(reply with the number|which one\?).{0,200}session limit",
+    r"couldn'?t (?:dispatch|reach|run) the (?:agents|searchers)",
+    r"skip the agents",
+]
+
+
+def degraded(t: "Transcript") -> bool:
+    """Did the run adapt to a failure, rather than merely stop?
+
+    Graded on `visible` — this is about what the run said to the user, not about
+    an error the CLI printed around it.
+    """
+    return any(re.search(p, t.visible, re.I | re.S) for p in DEGRADED)
 
 
 def load_progress(case: Case) -> dict | None:
@@ -1769,6 +1798,10 @@ def load_progress(case: Case) -> dict | None:
     try:
         d = json.loads(p.read_text())
     except json.JSONDecodeError:
+        return None
+    if d.get("degraded"):
+        print("  saved progress is from a run that adapted to a failure mid-way,")
+        print("  so resuming it would answer a different question — starting fresh")
         return None
     return d if d.get("session") and d.get("turns_done", 0) > 0 else None
 
