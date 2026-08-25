@@ -50,30 +50,33 @@ the most common path, in a message the user reads.
   rather than after the whole list has fired at a dead session. `auto` has
   already advanced across two separate quota windows this way.
 
-## P2 — Six features are implemented and unverified
+## P2 — Three cases still unobserved
 
-`--verify` is confirmed (6/6, against planted signature drift). The rest have
-never been observed in a real run:
+Most of what was added has now been seen working:
 
-| Feature | Case | Status |
+| Feature | Case | Result |
 |---|---|---|
-| Complexity budgets | `budget` | never run |
-| `decisions.md` | `decisions` | never run |
-| `--auto` | `auto` | 2 of 6 checkpoints, twice interrupted |
-| `[tool.spyglass]` | `config` | never run |
-| `--audit` | `audit` | never run |
-| `conformance-log.md` | `conformance-log` | never run |
+| `--verify` | `verify` | 6/6, against planted signature drift |
+| `--audit` | `audit` | 4/4 — three assessors, both planted problems reached |
+| `--auto` | `auto` | 4/4 — stopped for the ambiguity, reported its own decisions |
+| Complexity budgets | `budget` | 3/3 |
+| `decisions.md` | `decisions` | 3/3 — first run captured the dateutil fact it was built for |
 
-Graders for all of them are proven in both directions in the self-test, which
-establishes that the checks work and nothing about whether the features do.
+Still unobserved:
 
-**`audit` is the one to run first.** It is a new flow rather than an addition to
-an existing one, it dispatches three agents in modes they have never been asked
-for, and two of those modes — the style checker reading source, the complexity
-assessor with no change path — are new instructions on old agents. That is the
-largest untested surface of anything here.
+| Feature | Case | Why |
+|---|---|---|
+| `[tool.spyglass]` | `config` | Quota; its one graded run failed on the HIL-10 bug, not the config |
+| `conformance-log.md` | `conformance-log` | Quota; its own assertion passed, the run failed on contamination |
+| The HIL-10 fix | `vague-go-ahead` | Quota — **and this one is P1** |
 
-## P2 — `--suggest-refactors` output is verified once, on one function## P2 — `--suggest-refactors` output is verified once, on one function
+`vague-go-ahead` is the one that matters. It reproduces a run that wrote two
+files into the fixture and edited a third after being told "Yes, that all looks
+right. Continue." The fix is in and unproven, and this is the only defect found
+in this project that puts a diff in someone's repository rather than a sentence
+in a document.
+
+## P2 — `--suggest-refactors` output is verified once, on one function## P2 — `--suggest-refactors` output is verified once, on one function## P2 — `--suggest-refactors` output is verified once, on one function
 
 Working, and better than specified: a run reasoned against the tool's own plans,
 recommending a different fix because *"complexipy's own two suggestions only
