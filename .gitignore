@@ -18,3 +18,9 @@ tests/.last-visible.txt
 tests/.transcripts/
 tests/.tools-venv/
 tests/.progress/
+# complexipy writes this when run from the repo root. It self-ignores today —
+# the same trick Spyglass uses — but relying on a tool to keep doing that is a
+# thin reason for it to stay out of someone's commit.
+.complexipy_cache/
+.mypy_cache/
+tests/.progress/
