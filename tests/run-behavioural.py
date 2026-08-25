@@ -152,10 +152,34 @@ def check_gitignore_untouched(_t: str, _) -> Result:
                   dirty or "")
 
 
-def check_self_ignored(_t: str, _) -> Result:
-    dirty = [l for l in git("status", "--porcelain").splitlines() if ".claude" in l]
-    return Result("artefact dir invisible to git", not dirty,
-                  "; ".join(dirty) if dirty else "")
+def check_self_ignored(_t, _) -> Result:
+    """The artefact tree must carry its own `.gitignore`, and it must contain `*`.
+
+    This used to assert only that `git status` was quiet about `.claude`, which
+    is a weaker claim than it looks. A run once failed to write the file at all;
+    the notes were then swept into a commit by an unrelated `git add -A`, and
+    tracked-and-unchanged files do not appear in `git status` — so the check went
+    green on a directory that had never been ignored in its life.
+
+    Assert the file. It is the mechanism the promise depends on, it cannot be
+    satisfied accidentally, and it is immune to whatever the surrounding
+    repository happens to ignore.
+    """
+    root = FIXTURE / ".claude/spyglass"
+    if not root.is_dir():
+        return Result("artefact dir invisible to git", False, "no artefact directory")
+    ignore = root / ".gitignore"
+    if not ignore.is_file():
+        return Result("artefact dir invisible to git", False,
+                      "no .gitignore — the notes are visible in the user's repo")
+    if "*" not in ignore.read_text():
+        return Result("artefact dir invisible to git", False,
+                      f".gitignore does not ignore everything: {ignore.read_text()!r}")
+    tracked = git("ls-files", "tests/fixtures/sample-project/.claude")
+    if tracked:
+        return Result("artefact dir invisible to git", False,
+                      "artefacts are tracked by git: " + tracked.splitlines()[0])
+    return Result("artefact dir invisible to git", True)
 
 
 def check_no_implementation(_t: str, _) -> Result:

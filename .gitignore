@@ -23,4 +23,3 @@ tests/.progress/
 # thin reason for it to stay out of someone's commit.
 .complexipy_cache/
 .mypy_cache/
-tests/.progress/
