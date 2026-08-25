@@ -76,7 +76,7 @@ right. Continue." The fix is in and unproven, and this is the only defect found
 in this project that puts a diff in someone's repository rather than a sentence
 in a document.
 
-## P2 — `--suggest-refactors` output is verified once, on one function## P2 — `--suggest-refactors` output is verified once, on one function## P2 — `--suggest-refactors` output is verified once, on one function
+## P2 — `--suggest-refactors` output is verified once, on one function
 
 Working, and better than specified: a run reasoned against the tool's own plans,
 recommending a different fix because *"complexipy's own two suggestions only
