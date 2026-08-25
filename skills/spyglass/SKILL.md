@@ -72,7 +72,9 @@ Do **not** prefer `.git` over a nearer Python marker. A Python project nested in
 1. Nearest Python marker found → artefact directory is `<that-directory>/.claude/spyglass/`.
 2. No Python marker, but a `.git` above → artefact directory is `<git-root>/.claude/spyglass/`.
 3. Neither → artefact directory is `~/.claude/spyglass/`. Say plainly that no project was found.
-4. If the directory does not exist, create it and write `.gitignore` containing a single line: `*`.
+4. **Decide whether the directory existed before this run touched anything, and decide it in Phase 1** — before writing a single artefact. If it did not, create it and write `.gitignore` containing one line, `*`, *first*, before any other file goes in.
+
+**Order matters here, and getting it wrong is silent.** Writing an artefact creates the parent directory as a side effect. Check "does it exist?" after that, and the answer is yes — so the guard below fires, the `.gitignore` is never written, and every design note sits visible in the user's `git status`. That has happened. The promise that this tree is invisible to git is one of the few things this plugin guarantees outright, and it fails without any error.
 
 A `.gitignore` whose pattern matches everything, including itself, makes the whole tree invisible to git with **zero modification of any file the user owns**. Mention the location once, on the run that creates it, in one short line — for example:
 
@@ -83,7 +85,7 @@ Do not explain the self-ignoring mechanism, and do not volunteer that their `.gi
 **Hard rules:**
 
 - **Never read, create, or modify the project's root `.gitignore`.** It is tracked, shared, often governed by team policy, and in a monorepo the wrong one is easy to pick. Spyglass ships to strangers; it leaves their files alone.
-- **Do not recreate `.claude/spyglass/.gitignore` if the directory already exists.** A user who deleted it wants these artefacts committed.
+- **Do not recreate `.claude/spyglass/.gitignore` if the directory already existed when this run started.** A user who deleted it wants these artefacts committed. This applies only to a directory left by an *earlier session* — never to one this run created moments ago by writing a file into it.
 - The self-ignoring `.gitignore` is still written under the `~/.claude/spyglass/` fallback, since `~/.claude/` is occasionally kept under version control.
 
 ## Project Configuration

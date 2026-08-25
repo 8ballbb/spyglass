@@ -1187,6 +1187,7 @@ CASES = [
         checks=[
             check_no_jargon,
             check_artefact_set,
+            check_self_ignored,
             check_plan_headings,
             check_no_implementation,
         ],
@@ -1435,6 +1436,7 @@ CASES = [
         checks=[
             check_no_jargon,
             check_budget_recorded,
+            check_self_ignored,
             check_no_implementation,
         ],
     ),
@@ -1452,6 +1454,7 @@ CASES = [
         checks=[
             check_no_jargon,
             check_decisions_recorded,
+            check_self_ignored,
             check_no_implementation,
         ],
     ),
@@ -1536,6 +1539,7 @@ CASES = [
         checks=[
             check_no_jargon,
             check_refused_vague_go_ahead,
+            check_self_ignored,
             check_no_implementation,
         ],
     ),

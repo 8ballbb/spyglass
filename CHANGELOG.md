@@ -4,6 +4,12 @@
 
 ### Fixed
 
+- **Design notes are invisible to git again.** The self-ignoring `.gitignore`
+  that hides `.claude/spyglass/` was sometimes never written, leaving every
+  design note showing in `git status`. Writing an artefact creates the parent
+  directory as a side effect, so a later "does this directory already exist?"
+  check answered yes and skipped the file. Silent, and it broke one of the few
+  things this plugin guarantees outright.
 - **A vague answer at the final checkpoint no longer authorises writing code.**
   Asked "implement now, hand off, or stop here?" and answered "yes, that all
   looks right, continue", Spyglass wrote two files and edited a third. A generic
