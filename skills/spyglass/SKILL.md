@@ -63,6 +63,12 @@ The good version carries every decision the user can actually act on, and none o
 
 **One exception:** if a resolution genuinely surprises the user's expectation — the project root landed somewhere they would not predict, or no project was found at all — say so in one plain sentence, because they may need to move and re-run. State the fact, not the rule that produced it.
 
+## Dispatching Agents
+
+Every agent this document names — `spyglass:codebase-searcher`, `spyglass:complexity-assessor`, and the rest — is a real agent definition with its own file, its own rules, and its own fallback behaviour, none of which live in this document. **Dispatching one means calling the Agent tool with `subagent_type` set to its exact namespaced name.** A behavioural run has been observed writing a prompt that reconstructed `complexity-assessor`'s rules from memory — the tool flags, the fallback order, the threshold — and sending it to `subagent_type: general-purpose` instead, for `complexity-assessor`, `style-checker`, and `refactor-assessor` in a single run. Nothing announced this. The output was detailed enough to look correct, and it was missing every guardrail this document does not happen to restate: never reconciling two measuring tools against each other, never prompting to install one, the exact interpretation of a borderline score.
+
+**Every "Receives" line below names the agent to dispatch. That name is the literal `subagent_type` value** — `spyglass:complexity-assessor`, not "a complexity assessment", and never `general-purpose` carrying a hand-written imitation of one. If a real agent exists for the work, use it; do not reason that you already know what it would say.
+
 ## Artefact Directory Resolution
 
 **Nearest marker wins.** Walk upward from the working directory and stop at the **first** directory containing a Python project marker — `pyproject.toml`, `setup.py`, `setup.cfg`, or `requirements.txt`. Only if none is found anywhere above, fall back to the nearest `.git`.
@@ -98,8 +104,8 @@ Some answers do not change between features. The docstring convention is the sam
 [tool.spyglass]
 docstring_style   = "google"      # google | numpy | sphinx — settles Phase 3
 complexity_budget = 15            # cognitive complexity target for new functions
-max_function_lines = 40           # Phase 7's soft limit
-max_class_lines   = 200           # Phase 7's limit, and signal S3's threshold
+max_function_lines = 40           # Phase 7's hard (blocking) limit
+max_class_lines   = 200           # Phase 7's hard (blocking) limit, and signal S3's threshold
 auto              = false         # run unattended by default
 exclude           = ["migrations/**", "vendor/**"]
 ```
@@ -253,9 +259,9 @@ def function_name(param: Type, param2: Type = default) -> ReturnType:
 ```
 Plus class skeletons with `__init__`, public methods, and `@property` definitions. Level 2 is the design rationale; Level 3 is the interface contract implementation starts from.
 
-**Constraints flagged here:** function > 40 lines of logic → redesign; class > 200 lines → split; a contract describing two distinct operations → split candidate.
+**Constraints flagged here:** function > `max_function_lines` (40 if unset) lines of logic → redesign; class > `max_class_lines` (200 if unset) lines → split; a contract describing two distinct operations → split candidate.
 
-**Existing-code impact check:** where the plan adds to an existing class or module, estimate resulting size. Exceeding 200 lines, or adding a second distinct responsibility, raises **signal S3**.
+**Existing-code impact check:** where the plan adds to an existing class or module, estimate resulting size. Exceeding `max_class_lines` (200 if unset), or adding a second distinct responsibility, raises **signal S3**.
 
 **Save:** on HIL-3 approval, write all three stages to `<artefact-dir>/<slug>/pseudocode.md`. This is the working document for the rest of the run.
 
@@ -326,9 +332,9 @@ A `partial-use` must specify: which source at which priority and for what; what 
 
 ### Phase 7 — Style & Principles Review — Required — `spyglass:style-checker`
 
-**Receives:** `pseudocode_doc_path`, and `standards_path` — the **absolute path** to `python-standards.md`, resolved from this skill's own directory (it is a sibling of this file). Resolve and pass it explicitly: the agent runs with the *user's project* as its working directory, where a relative path to the plugin's own files does not exist, so without an absolute path the rulebook is simply unreadable. Checks only what pseudo-code can reveal.
+**Receives:** `pseudocode_doc_path`; `standards_path` — the **absolute path** to `python-standards.md`, resolved from this skill's own directory (it is a sibling of this file). Resolve and pass it explicitly: the agent runs with the *user's project* as its working directory, where a relative path to the plugin's own files does not exist, so without an absolute path the rulebook is simply unreadable; and `max_function_lines` / `max_class_lines` — the effective values from Project Configuration (40 / 200 if neither the session nor `[tool.spyglass]` set them). Pass the resolved numbers explicitly rather than letting the agent assume its own defaults, or a project override silently never reaches the check it's meant to change. Checks only what pseudo-code can reveal.
 
-**Hard violations — blocking:** function estimated at > 40 lines of logic; class estimated at > 200 lines total; `staticmethod` where a module-level function would serve; mutable default arguments in Level 3 signatures.
+**Hard violations — blocking:** function estimated at > `max_function_lines` lines of logic; class estimated at > `max_class_lines` lines total; `staticmethod` where a module-level function would serve; mutable default arguments in Level 3 signatures.
 
 **Design violations — advisory:** a contract describing two distinct operations (judge the operations, not the word "and"); function name does not clearly describe what it does; public function lacks type annotations; public function lacks a docstring; class does more than one thing.
 
@@ -364,7 +370,7 @@ So here is the sentence. When a signal fires and you are about to assess refacto
 
 No identifier, no phase name, no "this triggers". The user learns what is true about their code and what decision is coming. Everything else is bookkeeping they did not ask to see.
 
-**Receives:** fired signals with evidence, `pseudocode.md`, complexity report (if run), pattern report (if run). When S1 fired and complexipy measured it, the complexity report carries **deterministic refactor plans** — line ranges, rules and estimated complexity reductions produced by the tool. Treat those as measured evidence to reason from, not as the recommendation: the analyser knows nothing about what the change is for, or which of its suggestions conflict. **Scope cap:** maximum 5 recommendations, restricted to files the task already touches. If more candidates exist, report the count dropped rather than silently truncating.
+**Receives:** fired signals with evidence, `pseudocode.md`, complexity report (if run), pattern report (if run), and the effective `complexity_budget` / `max_class_lines` from Project Configuration so its evidence cites the project's actual thresholds rather than assumed defaults. When S1 fired and complexipy measured it, the complexity report carries **deterministic refactor plans** — line ranges, rules and estimated complexity reductions produced by the tool. Treat those as measured evidence to reason from, not as the recommendation: the analyser knows nothing about what the change is for, or which of its suggestions conflict. **Scope cap:** maximum 5 recommendations, restricted to files the task already touches. If more candidates exist, report the count dropped rather than silently truncating.
 
 **Output per recommendation:** file and function; motivating signal; the problem; specific approach (extract function, split class, generalise existing function to absorb the new case, unify duplicates, flatten nesting); `order` (`before-current-task` | `after-current-task`); `risk` (`low` internal only | `medium` changes signatures | `high` changes public API or module boundary).
 
@@ -570,6 +576,8 @@ Note which option comes first. Doing nothing is the cheapest outcome available, 
 **Wait for:** both decisions. Update `pseudocode.md` after.
 
 ### HIL-7 (batched) — Refactor findings and adoption *(after Phases 8 and 9; conditional on a signal firing)*
+
+**Do not name this checkpoint either.** A behavioural run opened it with *"Now this is the batched refactor checkpoint (HIL-7)."* — announcing its own transition, complete with the internal number, precisely what **Speaking to the User** rule 3 already forbids. Go straight to what was found: "Your change touches `load_records`, which is already dense — complexipy scores it 28 against a threshold of 15." No preamble naming what kind of checkpoint this is.
 
 **Present** in one message:
 - **Why this ran** — the reason, in the user's terms, with evidence. Name the finding, never the signal: "your change touches `parse_records`, which is already dense — radon grades it D"; "`utils.normalise_date` already covers about 70% of what this plan would build". Writing "S1:" or "S2:" here is exactly the leak that **Speaking to the User** forbids, and this is the checkpoint where it happens, because this is the only one whose whole subject is an internal signal.

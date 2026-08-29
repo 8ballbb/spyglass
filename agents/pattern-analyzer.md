@@ -23,7 +23,7 @@ In priority order:
 3. Most recently modified — `git log --name-only -n 20` inside a repo, `ls -t` outside one
 4. Remaining files up to the cap
 
-Stop at 10. Report how many you read and how many you skipped.
+Stop at 10. Report the **list of paths you read**, not just a count — `codebase-searcher` receives this list verbatim as `prior_file_list` and uses it to skip re-reading the same files, so the count alone gives it nothing to skip. Report how many you skipped too.
 
 ## What to report
 

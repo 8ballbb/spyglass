@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.3.1 — 2026-08-29
+
+### Fixed
+
+- **Agents were sometimes dispatched as `general-purpose`, running a
+  hand-reconstructed imitation of the real agent's rules instead of the real
+  agent.** A behavioural run caught every `Agent` tool call in one session —
+  the style check, the complexity assessment, the refactor assessment — going
+  out with `subagent_type: general-purpose`, never the actual
+  `spyglass:complexity-assessor` or its siblings. The output still looked
+  correct, which is exactly why nothing before this had noticed: only the
+  dispatch itself, not its output, could tell the difference. `SKILL.md` now
+  states plainly that an agent's name is the literal `subagent_type` value to
+  pass, and the test harness now persists the raw stream-json per run so this
+  class of question never again depends on trusting a transcript summary.
+- **The signal-identifier leak (`S1 fired: ...`) is verified fixed**, after
+  three prior attempts closed the exact phrasing observed each time and left
+  the next one open. Verified now with repeated real runs, not inferred.
+- **A checkpoint could still name itself**, the same leak as the signal
+  identifier one on a different token — "Now this is the batched refactor
+  checkpoint (HIL-7)." Fixed with the same treatment that made the
+  signal-identifier fix hold: the exact observed sentence, and the corrected
+  one, at the checkpoint's own specification.
+- **Configured size and complexity limits now reach the agents that enforce
+  them.** `max_function_lines`, `max_class_lines`, and per-function complexity
+  budgets were configurable but three agents hardcoded the defaults in their
+  own prose regardless, so a project override in `[tool.spyglass]` silently
+  never took effect.
+
 ## 0.3.0 — 2026-08-24
 
 ### Fixed

@@ -11,11 +11,12 @@ You recommend refactors that are worth doing because a signal fired — not beca
 ## What you receive
 
 - The fired signals with their evidence. One or more of:
-  - **S1** — a function in the change path is over its measuring tool's threshold: cognitive complexity above 15 (complexipy) or grade C or worse (radon)
+  - **S1** — a function in the change path is over its measuring tool's threshold: cognitive complexity above the project's `complexity_budget` (complexipy; 15 if unset) or grade C or worse (radon)
   - **S2** — existing codebase code does most of the planned job
-  - **S3** — the plan pushes an existing class past 200 lines, or gives a module a second responsibility
+  - **S3** — the plan pushes an existing class past the project's `max_class_lines` (200 if unset), or gives a module a second responsibility
   - **S4** — patterns in the target directories are inconsistent
 - `pseudocode.md`, plus the complexity and pattern reports when those phases ran
+- The project's effective `complexity_budget` and `max_class_lines`, supplied by the caller, so the evidence you cite matches the thresholds actually in force rather than this file's defaults
 
 **Where complexipy measured the complexity, the report carries its refactor plans** — line ranges, named rules, and estimated complexity reductions (`Lines 15-19 -> Estimated reduction: -~3 complexity (28 -> 25)`).
 

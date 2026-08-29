@@ -1,8 +1,8 @@
 # Spyglass — Plugin Design Spec
 
-**Date:** 2026-08-12, revised through 2026-08-20
+**Date:** 2026-08-12, revised through 2026-08-29
 **Status:** Built, published, and behaviourally tested. This document and the code govern; where they disagree, the code is what runs.
-**Revision:** 9 (conformance checking, audit, auto, project config, complexity budgets, decisions and conformance logs)
+**Revision:** 10 (agent dispatch verified against raw transcripts; a checkpoint naming itself, the same leak as the signal-identifier one, on a different token; configured size and complexity thresholds now reach the agents that enforce them)
 
 ---
 
@@ -192,7 +192,7 @@ System prompt content here.
 
 `name` and `description` are required. `tools` must be restricted to what the agent genuinely needs. `model` and `color` are optional.
 
-**Never omit `tools` to mean "no tools".** An omitted `tools` key makes the agent **inherit the parent's entire toolset** — the opposite of a restriction. The frontmatter schema has no way to express an empty tool set, so an agent that genuinely needs nothing (`stdlib-searcher`, which reasons purely from training knowledge) is given the narrowest harmless grant — `tools: Read` — with a frontmatter comment recording why the key must not be deleted, and a body instruction forbidding its use.
+**Never omit `tools` to mean "no tools".** An omitted `tools` key makes the agent **inherit the parent's entire toolset** — the opposite of a restriction. The frontmatter schema has no way to express an empty tool set, so an agent that genuinely needs nothing (`stdlib-searcher`, which reasons purely from training knowledge; `investigation-synthesiser`, whose four input reports arrive inline and have nothing on disk to read) is given the narrowest harmless grant — `tools: Read` — with a frontmatter comment recording why the key must not be deleted, and a body instruction forbidding its use. `investigation-synthesiser` originally carried this same grant without the comment or the instruction, which left it ambiguous whether it was meant to read something; it now matches `stdlib-searcher`'s treatment exactly.
 
 Agents are referenced as `spyglass:<agent-name>`.
 
@@ -571,6 +571,20 @@ HIL-10 now states that a generic affirmation is not a choice, gives the words to
 
 **A second finding came out of the same run.** The failure contaminated the two cases after it, because `reset-fixture.sh` restored tracked files with `git checkout` and left untracked ones alone — so `currency.py` sat in the fixture and failed the no-implementation check for cases that had never created it. Reset now runs `git clean` over the fixture as well.
 
+## Agent dispatch verified as itself, not reconstructed from memory
+
+A `modify --repeat 3` behavioural run failed two of three times on "dispatched complexity-assessor" and "raised refactoring unprompted", while the visible transcript showed what looked like a complete, correctly-shaped complexity report. That is the exact fingerprint of the `no-refactor` grader bug above — a real dispatch the harness failed to detect — so before touching anything, the harness was given raw stream-json persistence (`save_raw`/`reset_raw` in `run-behavioural.py`, writing to `tests/.transcripts/<case>.raw.jsonl`) to settle the question with evidence rather than repeat a diagnosis that was already wrong once.
+
+It was not a repeat. The raw JSONL showed every `Agent` tool call in the failing run — the style check, the complexity assessment, the refactor assessment — dispatched with `subagent_type: general-purpose`, never the actual `spyglass:complexity-assessor` or its siblings. The prompt sent to each reconstructed that agent's own rules from memory closely enough that the output passed for correct, which is exactly why nobody had noticed: nothing before this checked the dispatch itself, only its output.
+
+Nowhere in this document or the agent files was the mechanical fact ever stated that dispatching an agent means setting the Agent tool's `subagent_type` to its exact namespaced name. `SKILL.md` now has a "Dispatching Agents" section saying so directly and naming this run as the example of what not to do. Verified: `modify --repeat 3`, 3/3, `subagent_type` confirmed correct in the raw JSONL each time.
+
+**The same run, once fixed, surfaced the identical leak on a different token.** With dispatch corrected, one of three repeats still failed `check_no_jargon`: *"Now this is the batched refactor checkpoint (HIL-7)."* — the checkpoint announcing its own transition and number, exactly what **Speaking to the User** already forbade (see *Never name the signal to the user*, above), on a token that fix never specifically reinforced at its point of use. HIL-7's own spec now names this sentence and gives the corrected one — not another prohibition, the literal replacement, the same treatment that made the signal-identifier fix hold. Verified: `modify --repeat 3`, 3/3, clean.
+
+### Configured thresholds now reach the agents that enforce them
+
+`max_function_lines` and `max_class_lines` were configurable in `[tool.spyglass]`, but `style-checker`, `refactor-assessor`, and `conformance-checker` hardcoded 40, 200, and 15 in their own prose regardless — a project override silently never reached the check it was meant to change. `conformance-checker` additionally measured every function against a flat 15 rather than each function's own recorded budget. All three now receive the effective values from the caller, falling back to the same defaults only when none was supplied — the pattern `complexity-assessor` already used correctly.
+
 ## Phase Specifications
 
 *Ordered by execution sequence.*
@@ -649,7 +663,7 @@ def function_name(param: Type, param2: Type = default) -> ReturnType:
 ```
 Class skeletons with `__init__`, public methods, `@property` definitions. Level 2 is the design rationale; Level 3 is the interface contract implementation starts from.
 
-**Constraints flagged here:** function > 40 lines of logic → redesign; class > 200 lines → split; a contract describing two distinct operations → split candidate.
+**Constraints flagged here:** function > `max_function_lines` (40 if unset) lines of logic → redesign; class > `max_class_lines` (200 if unset) lines → split; a contract describing two distinct operations → split candidate.
 
 **Existing-code impact check:** where the plan adds to an existing class or module, estimate resulting size. Exceeding 200 lines, or adding a second distinct responsibility, raises **signal S3**.
 
@@ -743,8 +757,8 @@ Four agents dispatched in a single multi-tool-call response, running concurrentl
 Reviews `pseudocode.md`. Checks only what pseudo-code can reveal.
 
 **Hard violations — blocking:**
-- Function estimated at > 40 lines of logic
-- Class estimated at > 200 lines total
+- Function estimated at > `max_function_lines` lines of logic
+- Class estimated at > `max_class_lines` lines total
 - `staticmethod` where a module-level function would serve
 - Mutable default arguments in Level 3 signatures (e.g. `def f(x: list = [])`)
 
@@ -912,7 +926,7 @@ Referenced as `spyglass:<name>`.
 | `stdlib-searcher` | Read (unused — narrowest grant, since omitting `tools` inherits everything) | Phase 5 |
 | `deps-searcher` | Read, Glob, Bash | Phase 5 |
 | `package-searcher` | WebSearch, WebFetch | Phase 5 |
-| `investigation-synthesiser` | Read | Phase 6 |
+| `investigation-synthesiser` | Read (unused — narrowest grant, since omitting `tools` inherits everything) | Phase 6 |
 | `style-checker` | Read | Phase 7 |
 | `complexity-assessor` | Read, Bash | Phase 8 (conditional) |
 | `refactor-assessor` | Read, Grep | Phase 9 (signal-driven) |

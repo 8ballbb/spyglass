@@ -1609,6 +1609,28 @@ class Transcript:
         return combined
 
 
+def save_raw(case: "Case", out: str) -> None:
+    """Append this turn's unparsed stream-json, before `harvest()` touches it.
+
+    `harvest()` is exactly the layer that was once wrong — the `subagent_type`
+    truncation bug made a dispatch look absent when the agent had run every
+    time (design-spec.md: the `no-refactor` case). When a dispatch check
+    disagrees with what the transcript visibly shows happened, the only way to
+    tell "the model skipped it" from "the harvester mis-parsed it" is to look
+    at what actually came back — and without this, that evidence is gone the
+    moment the run ends, so the question can only be answered by paying for
+    another run and hoping it repeats.
+    """
+    path = REPO / "tests/.transcripts" / f"{case.name}.raw.jsonl"
+    path.parent.mkdir(exist_ok=True)
+    with path.open("a") as f:
+        f.write(out)
+
+
+def reset_raw(case: "Case") -> None:
+    (REPO / "tests/.transcripts" / f"{case.name}.raw.jsonl").unlink(missing_ok=True)
+
+
 def harvest(stream: str) -> tuple[Transcript, str | None]:
     """Flatten a stream-json run into both views plus its session id."""
     spoken: list[str] = []
@@ -1861,6 +1883,7 @@ def converse(base: list[str], cwd: Path, session: str | None,
             return t, None, "no session id returned; cannot continue"
         print(f"  answering checkpoint {i + 1}/{len(turns)}…")
         _, out = sh(base + ["--resume", session, turns[i]], cwd=cwd)
+        save_raw(case, out)
         more, s = harvest(out)
         more.files = snapshot(cwd)
         session = s or session
@@ -1942,6 +1965,7 @@ def run_case(case: Case, dry: bool, model: str | None,
         clear_progress(case)
         sync_plugin()
         reset()
+        reset_raw(case)
     cwd, temp = workdir(case)
 
     try:
@@ -1955,11 +1979,13 @@ def run_case(case: Case, dry: bool, model: str | None,
         if case.setup:
             print(f"  setting up prior state ({len(case.setup)} turns, not graded)…")
             _, out0 = sh(base + [case.setup[0]], cwd=cwd)
+            save_raw(case, out0)
             pre, s0 = harvest(out0)
             for turn in case.setup[1:]:
                 if not s0:
                     break
                 _, o = sh(base + ["--resume", s0, turn], cwd=cwd)
+                save_raw(case, o)
                 more, s1 = harvest(o)
                 s0 = s1 or s0
                 pre = pre + more
@@ -1985,6 +2011,7 @@ def run_case(case: Case, dry: bool, model: str | None,
 
         print(f"  running in {cwd} (this spawns real agents and takes a few minutes)…")
         _, out = sh(base + [prompt], cwd=cwd)
+        save_raw(case, out)
         transcript, session = harvest(out)
         transcript.files = snapshot(cwd)
         save_progress(case, session, 0, transcript, prompt, turns)

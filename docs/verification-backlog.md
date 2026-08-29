@@ -9,36 +9,6 @@ Ordered by priority. **P1** means a user is affected today.
 
 ---
 
-## P1 — The signal-identifier leak fix is unverified
-
-**Status:** fixed three times, verified never.
-
-Spyglass reports internal refactor signals to the user in messages like
-`S1 fired: load_records already scores 28`. `S1` is bookkeeping; the user has
-never seen the document that defines it.
-
-| Attempt | What was changed | Outcome |
-|---|---|---|
-| 1 | HIL-7's worked example, which literally showed `"S1: parse_records is radon grade D"` as the thing to present | Leaked again, elsewhere |
-| 2 | An explicit rule that this covers reporting a signal did *not* fire | Leaked again, elsewhere |
-| 3 | Supplied the replacement sentence, plus "do not narrate your own transitions" | **Unverified** |
-
-The first two attempts were prohibitions. Each closed the exact phrasing that
-had been observed and left the next one open — the model needs the sentence to
-say, not another thing not to say. That is the same lesson as the clarification
-checkpoint, whose options all built something because its own example's options
-all built something.
-
-**How to verify:** `tests/run-behavioural.py --case modify`. It is the cheapest
-case that fires a signal, and `check_no_jargon` catches the leak — that check is
-how all three were found. Run it at `--repeat 3`: the second attempt passed one
-run before failing the next, so a single green proves little here.
-
-**Why P1:** it is the most visible defect remaining. It appears in normal use, on
-the most common path, in a message the user reads.
-
----
-
 ## Resolved since this list was written
 
 - **`oversized-module`** — graded at last, 3/3. Seven attempts; the fix was the
@@ -49,6 +19,31 @@ the most common path, in a message the user reads.
   resume where they stopped, and an abort is detected on the turn it happens
   rather than after the whole list has fired at a dead session. `auto` has
   already advanced across two separate quota windows this way.
+- **The HIL-10 vague-go-ahead fix** — `vague-go-ahead`, 3/3. A generic
+  affirmation ("Yes, that all looks right. Continue.") now gets asked again at
+  every checkpoint of the run rather than being read as the implement-now
+  choice, three independent times against identical input.
+- **The signal-identifier leak fix** (2026-08-29) — `S1 fired: load_records
+  already scores 28`-style leaks. Fixed three times before this and verified
+  never; verified now: `modify --repeat 3`, 3/3, with a signal genuinely
+  firing and reported (`"load_records`, which is already dense — complexipy
+  scores it 28 against a threshold of 15") without ever naming `S1`.
+- **Agents dispatched as `general-purpose` instead of themselves** (2026-08-29)
+  — a `modify --repeat 3` run caught every `Agent` tool call in one session
+  going out as `subagent_type: general-purpose` carrying a hand-reconstructed
+  imitation of `complexity-assessor`'s/`style-checker`'s/`refactor-assessor`'s
+  own rules, well-formed enough to pass unnoticed until dispatch itself was
+  checked against the raw stream-json rather than the flattened transcript.
+  `SKILL.md` now has a "Dispatching Agents" section stating that a "Receives"
+  line's agent name is the literal `subagent_type` value. Fixed the run after
+  it was found: `modify --repeat 3`, 3/3, `subagent_type` confirmed correct in
+  the raw JSONL each time (`tests/.transcripts/modify.raw.jsonl`, now
+  persisted by `run-behavioural.py` for exactly this kind of check).
+- **A checkpoint (HIL-7) naming itself** (2026-08-29) — the same shape of leak
+  as the signal-identifier one above, on a different token: *"Now this is the
+  batched refactor checkpoint (HIL-7)."* HIL-7's own spec now names this exact
+  sentence and gives the corrected one, the treatment that made the
+  signal-identifier fix hold. Verified: `modify --repeat 3`, 3/3.
 
 ## P2 — Three cases still unobserved
 
@@ -68,13 +63,11 @@ Still unobserved:
 |---|---|---|
 | `[tool.spyglass]` | `config` | Quota; its one graded run failed on the HIL-10 bug, not the config |
 | `conformance-log.md` | `conformance-log` | Quota; its own assertion passed, the run failed on contamination |
-| The HIL-10 fix | `vague-go-ahead` | Quota — **and this one is P1** |
 
-`vague-go-ahead` is the one that matters. It reproduces a run that wrote two
+`vague-go-ahead` is resolved — see above. It reproduced a run that wrote two
 files into the fixture and edited a third after being told "Yes, that all looks
-right. Continue." The fix is in and unproven, and this is the only defect found
-in this project that puts a diff in someone's repository rather than a sentence
-in a document.
+right. Continue.", and was the only defect found in this project that puts a
+diff in someone's repository rather than a sentence in a document.
 
 ## P2 — `--suggest-refactors` output is verified once, on one function
 

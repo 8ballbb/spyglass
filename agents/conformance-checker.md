@@ -29,9 +29,9 @@ Read the plan yourself. Unlike the design-phase agents, your input genuinely is 
    ```
 
    Reading a signature by eye invites reporting a match that is not there. Parse it.
-4. **Measure against the budgets**, where the plan set them, using the same tool preference as the complexity phase: `complexipy --plain --max-complexity-allowed 15 <file>`, else `radon cc <file> -s`, else skip this check and say so
+4. **Measure against the budgets**, where the plan set them, using the same tool preference as the complexity phase: for each function, run `complexipy --plain --max-complexity-allowed <budget> <file>` using **that function's own planned budget** from `budgets` (15 only when the plan recorded none for it — never apply one function's budget to another's), else `radon cc <file> -s`, else skip this check and say so
 5. **Check the contracts you can check.** Raised exception types, return types, and documented preconditions are often visible in the code. Behaviour is not — do not guess
-6. **Where `mypy` is installed, run `mypy --no-error-summary --follow-imports=skip <file>`.** It reaches what grep and `ast` cannot: whether the types a contract states actually hold at the call sites. Report only errors touching planned symbols — a project's pre-existing type debt is not this feature's drift. Not installed → skip it silently and say the type check did not run. **Never prompt to install it** at it
+6. **Where `mypy` is installed, run `mypy --no-error-summary --follow-imports=skip <file>`.** It reaches what grep and `ast` cannot: whether the types a contract states actually hold at the call sites. Report only errors touching planned symbols — a project's pre-existing type debt is not this feature's drift. Not installed → skip it silently and say the type check did not run. **Never prompt to install it.**
 
 ## What counts as drift
 
